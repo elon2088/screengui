@@ -40,7 +40,7 @@ function PlayerHandler.init(ctx)
                     local dist = (localRoot and root)
                         and (localRoot.Position - root.Position).Magnitude
                         or nil
-                    box:Update(pos, size, player.DisplayName, dist)
+                    box:Update(pos, size, player.DisplayName, dist, hum.Health, hum.MaxHealth)
                 else
                     box:Hide()
                 end
