@@ -21,16 +21,19 @@ local CFG = {
     HealthTextSize = 9,
 }
 
-local gui              = Instance.new("ScreenGui")
-gui.Name               = "BoxESP"
-gui.ResetOnSpawn       = false
-gui.ZIndexBehavior     = Enum.ZIndexBehavior.Sibling
-gui.IgnoreGuiInset     = true
-
-if gethui then
-    gui.Parent = gethui()
-else
-    gui.Parent = game:GetService("CoreGui")
+local gui
+do
+    local existing = (gethui and gethui() or game:GetService("CoreGui")):FindFirstChild("BoxESP")
+    if existing then
+        gui = existing
+    else
+        gui                = Instance.new("ScreenGui")
+        gui.Name           = "BoxESP"
+        gui.ResetOnSpawn   = false
+        gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        gui.IgnoreGuiInset = true
+        gui.Parent         = gethui and gethui() or game:GetService("CoreGui")
+    end
 end
 
 local function healthColor(pct)
@@ -98,8 +101,9 @@ function Box.new(features)
         name.TextStrokeColor3       = CFG.OutlineColor
         name.TextXAlignment         = Enum.TextXAlignment.Center
         name.Text                   = ""
+        name.Visible                = false
         name.ZIndex                 = self._border.ZIndex + 1
-        name.Parent                 = self._border
+        name.Parent                 = gui
         self._name                  = name
     end
 
@@ -116,8 +120,9 @@ function Box.new(features)
         dist.TextStrokeColor3       = CFG.OutlineColor
         dist.TextXAlignment         = Enum.TextXAlignment.Center
         dist.Text                   = ""
+        dist.Visible                = false
         dist.ZIndex                 = self._border.ZIndex + 1
-        dist.Parent                 = self._border
+        dist.Parent                 = gui
         self._dist                  = dist
     end
 
@@ -125,6 +130,7 @@ function Box.new(features)
         local hpBg              = Instance.new("Frame")
         hpBg.BackgroundColor3   = Color3.fromRGB(0, 0, 0)
         hpBg.BorderSizePixel    = 0
+        hpBg.Visible            = false
         hpBg.ZIndex             = self._border.ZIndex + 1
         hpBg.Parent             = gui
         self._hpBg              = hpBg
@@ -133,6 +139,7 @@ function Box.new(features)
         hpFill.BackgroundColor3   = Color3.fromRGB(255, 255, 255)
         hpFill.BorderSizePixel    = 0
         hpFill.AnchorPoint        = Vector2.new(0, 0)
+        hpFill.Visible            = false
         hpFill.ZIndex             = self._border.ZIndex + 2
         hpFill.Parent             = gui
         self._hpFill              = hpFill
@@ -160,6 +167,7 @@ function Box.new(features)
             hpText.TextStrokeColor3       = Color3.fromRGB(0, 0, 0)
             hpText.TextXAlignment         = Enum.TextXAlignment.Center
             hpText.Text                   = ""
+            hpText.Visible                = false
             hpText.ZIndex                 = self._border.ZIndex + 3
             hpText.Parent                 = gui
             self._hpText                  = hpText
@@ -190,13 +198,15 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth)
     self._inner.Visible   = true
 
     if f.name and self._name then
-        self._name.Position = UDim2.fromOffset(w * 0.5, -2)
+        self._name.Position = UDim2.fromOffset(x + w * 0.5, y - 2)
         self._name.Text     = displayName or ""
+        self._name.Visible  = true
     end
 
     if f.distance and self._dist then
-        self._dist.Position = UDim2.fromOffset(w * 0.5, h + 2)
+        self._dist.Position = UDim2.fromOffset(x + w * 0.5, y + h + 2)
         self._dist.Text     = distance and (math.floor(distance) .. "st") or ""
+        self._dist.Visible  = true
     end
 
     if f.healthbar and self._hpBg and self._hpFill then
@@ -235,6 +245,8 @@ function Box:Hide()
     self._outer.Visible  = false
     self._border.Visible = false
     self._inner.Visible  = false
+    if self._name    then self._name.Visible    = false end
+    if self._dist    then self._dist.Visible    = false end
     if self._hpBg    then self._hpBg.Visible    = false end
     if self._hpFill  then self._hpFill.Visible  = false end
     if self._hpText  then self._hpText.Visible  = false end
@@ -244,9 +256,11 @@ function Box:Destroy()
     self._outer:Destroy()
     self._border:Destroy()
     self._inner:Destroy()
-    if self._hpBg    then self._hpBg:Destroy()   end
-    if self._hpFill  then self._hpFill:Destroy() end
-    if self._hpText  then self._hpText:Destroy() end
+    if self._name    then self._name:Destroy()    end
+    if self._dist    then self._dist:Destroy()    end
+    if self._hpBg    then self._hpBg:Destroy()    end
+    if self._hpFill  then self._hpFill:Destroy()  end
+    if self._hpText  then self._hpText:Destroy()  end
 end
 
 local OFFSETS = {
@@ -287,7 +301,13 @@ local function GetBoundingBox(character)
     return Vector2.new(minX, minY), Vector2.new(maxX - minX, maxY - minY)
 end
 
+local _activeESP = nil
+
 function ESP.new(features)
+    if _activeESP then
+        _activeESP:Disable()
+    end
+
     local self = setmetatable({}, ESP)
 
     self._features = {
@@ -302,6 +322,7 @@ function ESP.new(features)
     self._GetBoundingBox = GetBoundingBox
     self._destroy        = nil
 
+    _activeESP = self
     return self
 end
 
