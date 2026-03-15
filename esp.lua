@@ -318,6 +318,19 @@ function ESP.new(features)
         healthtext  = features.healthtext  ~= false,
     }
 
+    if features.BorderColor    then CFG.BorderColor    = features.BorderColor    end
+    if features.OutlineColor   then CFG.OutlineColor   = features.OutlineColor   end
+    if features.NameColor      then CFG.NameColor      = features.NameColor      end
+    if features.DistColor      then CFG.DistColor      = features.DistColor      end
+    if features.BorderThick    then CFG.BorderThick    = features.BorderThick    end
+    if features.OutlineThick   then CFG.OutlineThick   = features.OutlineThick   end
+    if features.HealthWidth    then CFG.HealthWidth    = features.HealthWidth    end
+    if features.HealthGap      then CFG.HealthGap      = features.HealthGap      end
+    if features.HealthLerp     then CFG.HealthLerp     = features.HealthLerp     end
+    if features.NameSize       then CFG.NameSize       = features.NameSize       end
+    if features.DistSize       then CFG.DistSize       = features.DistSize       end
+    if features.HealthTextSize then CFG.HealthTextSize = features.HealthTextSize end
+
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
     self._destroy        = nil
