@@ -7,10 +7,12 @@ local Camera      = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
 local CFG = {
-    BorderColor    = Color3.fromRGB(0, 255, 255),
+    BorderColor    = Color3.fromRGB(255, 255, 255),
     OutlineColor   = Color3.fromRGB(0, 0, 0),
     BorderThick    = 0.9,
     OutlineThick   = 0.9,
+    FillColor      = Color3.fromRGB(255, 255, 255),
+    FillAlpha      = 0.4,
     NameColor      = Color3.fromRGB(255, 255, 255),
     NameSize       = 12,
     DistColor      = Color3.fromRGB(255, 255, 255),
@@ -79,9 +81,9 @@ function Box.new(features)
         fill.BorderSizePixel        = 0
         fill.Size                   = UDim2.fromScale(1, 1)
         fill.Position               = UDim2.fromScale(0, 0)
-        fill.Image                  = "rbxassetid://14514194653"
-        fill.ImageColor3            = CFG.BorderColor
-        fill.ImageTransparency      = 0.4
+        fill.Image                  = "rbxassetid://14514122503"
+        fill.ImageColor3            = CFG.FillColor
+        fill.ImageTransparency      = CFG.FillAlpha
         fill.ScaleType              = Enum.ScaleType.Stretch
         fill.ZIndex                 = self._border.ZIndex - 1
         fill.Parent                 = self._border
@@ -320,6 +322,8 @@ function ESP.new(features)
 
     if features.BorderColor    then CFG.BorderColor    = features.BorderColor    end
     if features.OutlineColor   then CFG.OutlineColor   = features.OutlineColor   end
+    if features.FillColor      then CFG.FillColor      = features.FillColor      end
+    if features.FillAlpha      then CFG.FillAlpha      = features.FillAlpha      end
     if features.NameColor      then CFG.NameColor      = features.NameColor      end
     if features.DistColor      then CFG.DistColor      = features.DistColor      end
     if features.BorderThick    then CFG.BorderThick    = features.BorderThick    end
