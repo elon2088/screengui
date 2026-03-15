@@ -7,37 +7,66 @@ function PlayerHandler.init(ctx)
     local Box            = ctx.Box
     local GetBoundingBox = ctx.GetBoundingBox
 
-    local boxes = {}
+    local boxes       = {}
+    local connections = {}
+
+    local localRoot = nil
+
+    local function updateLocalRoot()
+        local char = LocalPlayer.Character
+        localRoot  = char and char:FindFirstChild("HumanoidRootPart")
+    end
+
+    updateLocalRoot()
+    table.insert(connections, LocalPlayer.CharacterAdded:Connect(function(char)
+                
+        task.defer(updateLocalRoot)
+    end))
 
     local function Add(player)
         if player == LocalPlayer then return end
-        boxes[player] = Box.new()
+        if boxes[player] then return end 
+
+        local box = Box.new()
+        boxes[player] = {
+            box  = box,
+            conn = player.CharacterAdded:Connect(function()
+                box:Hide()
+            end)
+        }
     end
 
     local function Remove(player)
-        if boxes[player] then
-            boxes[player]:Destroy()
+        local entry = boxes[player]
+        if entry then
+            entry.conn:Disconnect()
+            entry.box:Destroy()
             boxes[player] = nil
         end
     end
 
     for _, p in ipairs(Players:GetPlayers()) do Add(p) end
-    local addedConn   = Players.PlayerAdded:Connect(Add)
-    local removedConn = Players.PlayerRemoving:Connect(Remove)
+    table.insert(connections, Players.PlayerAdded:Connect(Add))
+    table.insert(connections, Players.PlayerRemoving:Connect(Remove))
 
     local renderConn = RunService.RenderStepped:Connect(function()
-        local localChar = LocalPlayer.Character
-        local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
+ 
+        if not localRoot then
+            updateLocalRoot()
+        end
 
-        for player, box in pairs(boxes) do
+        for player, entry in next, boxes do
+            local box  = entry.box
             local char = player.Character
-            local hum  = char and char:FindFirstChildOfClass("Humanoid")
-            local root = char and char:FindFirstChild("HumanoidRootPart")
+            if not char then box:Hide() continue end
 
-            if char and hum and hum.Health > 0 then
+            local hum  = char:FindFirstChildOfClass("Humanoid")
+            local root = char:FindFirstChild("HumanoidRootPart")
+
+            if hum and hum.Health > 0 and root then
                 local pos, size = GetBoundingBox(char)
                 if pos then
-                    local dist = (localRoot and root)
+                    local dist = localRoot
                         and (localRoot.Position - root.Position).Magnitude
                         or nil
                     box:Update(pos, size, player.DisplayName, dist, hum.Health, hum.MaxHealth)
@@ -52,10 +81,10 @@ function PlayerHandler.init(ctx)
 
     return function()
         renderConn:Disconnect()
-        addedConn:Disconnect()
-        removedConn:Disconnect()
-        for player, box in pairs(boxes) do
-            box:Destroy()
+        for _, conn in ipairs(connections) do conn:Disconnect() end
+        for player, entry in next, boxes do
+            entry.conn:Disconnect()
+            entry.box:Destroy()
             boxes[player] = nil
         end
     end
