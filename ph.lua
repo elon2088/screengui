@@ -14,6 +14,7 @@ function PlayerHandler.init(ctx)
 
     FadeManager.setConfig("FadeDuration", FadeDuration)
 
+    local Camera      = workspace.CurrentCamera
     local boxes       = {}
     local connections = {}
     local localRoot   = nil
@@ -21,6 +22,29 @@ function PlayerHandler.init(ctx)
     local function updateLocalRoot()
         local char = LocalPlayer.Character
         localRoot  = char and char:FindFirstChild("HumanoidRootPart")
+    end
+
+    -- Captures all world-space part corners for accurate reprojection
+    local function getWorldCorners(character)
+        local corners = {}
+        local OFFSETS = {
+            Vector3.new( 1,  1,  1), Vector3.new(-1,  1,  1),
+            Vector3.new( 1, -1,  1), Vector3.new(-1, -1,  1),
+            Vector3.new( 1,  1, -1), Vector3.new(-1,  1, -1),
+            Vector3.new( 1, -1, -1), Vector3.new(-1, -1, -1),
+        }
+        for _, part in ipairs(character:GetChildren()) do
+            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                local cf = part.CFrame
+                local hX = part.Size.X * 0.5
+                local hY = part.Size.Y * 0.5
+                local hZ = part.Size.Z * 0.5
+                for _, o in ipairs(OFFSETS) do
+                    table.insert(corners, cf * Vector3.new(o.X * hX, o.Y * hY, o.Z * hZ))
+                end
+            end
+        end
+        return corners
     end
 
     updateLocalRoot()
@@ -44,11 +68,12 @@ function PlayerHandler.init(ctx)
             if not hum then return end
             if deathConn then deathConn:Disconnect() end
             deathConn = hum.Died:Connect(function()
-                local root = char:FindFirstChild("HumanoidRootPart")
-                local wp   = root and root.Position or lastRoot
-                if wp and lastPos and lastSize then
+                local root    = char:FindFirstChild("HumanoidRootPart")
+                local wp      = root and root.Position or lastRoot
+                local corners = getWorldCorners(char)
+                if wp and lastPos and lastSize and #corners > 0 then
                     local fadeBox = Box.new()
-                    FadeManager.trigger(fadeBox, wp, player.DisplayName, lastPos, lastSize, lastDist)
+                    FadeManager.trigger(fadeBox, wp, player.DisplayName, lastPos, lastSize, lastDist, corners)
                 end
                 box:Hide()
             end)
