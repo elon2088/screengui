@@ -215,7 +215,7 @@ function Box.new(features)
             ColorSequenceKeypoint.new(0.65, Color3.fromRGB(170, 80,  0)),
             ColorSequenceKeypoint.new(1,    Color3.fromRGB(150, 0,   0)),
         })
-        grad.Rotation = 270
+        grad.Rotation = 90
         grad.Parent   = hpFill
 
         if features.healthtext then
