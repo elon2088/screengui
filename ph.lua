@@ -6,10 +6,13 @@ function PlayerHandler.init(ctx)
     local RunService     = ctx.RunService
     local Box            = ctx.Box
     local GetBoundingBox = ctx.GetBoundingBox
+    local FadeDuration   = ctx.FadeDuration or 2.5
 
     local FadeManager = loadstring(game:HttpGet(
         "https://raw.githubusercontent.com/elon2088/screengui/refs/heads/main/fade.lua"
     ))()
+
+    FadeManager.setConfig("FadeDuration", FadeDuration)
 
     local boxes       = {}
     local connections = {}
@@ -29,10 +32,13 @@ function PlayerHandler.init(ctx)
         if player == LocalPlayer then return end
         if boxes[player] then return end
 
-        local box = Box.new()
-        local lastRoot = nil
+        local box        = Box.new()
+        local lastPos    = nil
+        local lastSize   = nil
+        local lastDist   = nil
+        local lastRoot   = nil
+        local deathConn  = nil
 
-        local deathConn = nil
         local function setupHum(char)
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             if not hum then return end
@@ -40,9 +46,9 @@ function PlayerHandler.init(ctx)
             deathConn = hum.Died:Connect(function()
                 local root = char:FindFirstChild("HumanoidRootPart")
                 local wp   = root and root.Position or lastRoot
-                if wp then
+                if wp and lastPos and lastSize then
                     local fadeBox = Box.new()
-                    FadeManager.trigger(fadeBox, wp, player.DisplayName)
+                    FadeManager.trigger(fadeBox, wp, player.DisplayName, lastPos, lastSize, lastDist)
                 end
                 box:Hide()
             end)
@@ -52,23 +58,46 @@ function PlayerHandler.init(ctx)
 
         local charConn = player.CharacterAdded:Connect(function(char)
             box:Hide()
-            task.defer(function()
-                setupHum(char)
-            end)
+            lastPos  = nil
+            lastSize = nil
+            lastDist = nil
+            task.defer(function() setupHum(char) end)
         end)
 
         boxes[player] = {
-            box      = box,
-            charConn = charConn,
-            getRoot  = function()
-                local char = player.Character
-                local root = char and char:FindFirstChild("HumanoidRootPart")
-                if root then lastRoot = root.Position end
-                return root
-            end,
+            box     = box,
             cleanup = function()
                 charConn:Disconnect()
                 if deathConn then deathConn:Disconnect() end
+            end,
+            update  = function()
+                local char = player.Character
+                if not char then box:Hide() return end
+
+                local hum  = char:FindFirstChildOfClass("Humanoid")
+                local root = char:FindFirstChild("HumanoidRootPart")
+
+                if root then lastRoot = root.Position end
+
+                if hum and hum.Health > 0 and root then
+                    local pos, size = GetBoundingBox(char)
+                    if pos then
+                        local dist = localRoot
+                            and (localRoot.Position - root.Position).Magnitude
+                            or nil
+
+                        lastPos  = pos
+                        lastSize = size
+                        lastDist = dist
+
+                        box:Update(pos, size, player.DisplayName, dist, hum.Health, hum.MaxHealth, char)
+                        box:SetTransparency(0)
+                    else
+                        box:Hide()
+                    end
+                else
+                    box:Hide()
+                end
             end
         }
     end
@@ -88,29 +117,8 @@ function PlayerHandler.init(ctx)
 
     local renderConn = RunService.RenderStepped:Connect(function()
         if not localRoot then updateLocalRoot() end
-
         for player, entry in next, boxes do
-            local box  = entry.box
-            local char = player.Character
-            if not char then box:Hide() continue end
-
-            local hum  = char:FindFirstChildOfClass("Humanoid")
-            local root = entry.getRoot()
-
-            if hum and hum.Health > 0 and root then
-                local pos, size = GetBoundingBox(char)
-                if pos then
-                    local dist = localRoot
-                        and (localRoot.Position - root.Position).Magnitude
-                        or nil
-                    box:Update(pos, size, player.DisplayName, dist, hum.Health, hum.MaxHealth, char)
-                    box:SetTransparency(0)
-                else
-                    box:Hide()
-                end
-            else
-                box:Hide()
-            end
+            entry.update()
         end
     end)
 
