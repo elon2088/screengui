@@ -21,6 +21,9 @@ local CFG = {
     HealthGap      = 1.5,
     HealthLerp     = 0.04,
     HealthTextSize = 9,
+    SkeletonColor  = Color3.fromRGB(255, 255, 255),
+    SkeletonThick  = 1,
+    SkeletonAlpha  = 0,
 }
 
 local gui
@@ -61,6 +64,61 @@ local function makeFrame(parent, strokeColor, strokeThick)
     s.Parent       = f
 
     return f
+end
+
+-- R15 and R6 skeleton connections
+local SKELETON_R15 = {
+    {"Head",          "UpperTorso"},
+    {"UpperTorso",    "LowerTorso"},
+    {"UpperTorso",    "LeftUpperArm"},
+    {"LeftUpperArm",  "LeftLowerArm"},
+    {"LeftLowerArm",  "LeftHand"},
+    {"UpperTorso",    "RightUpperArm"},
+    {"RightUpperArm", "RightLowerArm"},
+    {"RightLowerArm", "RightHand"},
+    {"LowerTorso",    "LeftUpperLeg"},
+    {"LeftUpperLeg",  "LeftLowerLeg"},
+    {"LeftLowerLeg",  "LeftFoot"},
+    {"LowerTorso",    "RightUpperLeg"},
+    {"RightUpperLeg", "RightLowerLeg"},
+    {"RightLowerLeg", "RightFoot"},
+}
+
+local SKELETON_R6 = {
+    {"Head",      "Torso"},
+    {"Torso",     "Left Arm"},
+    {"Torso",     "Right Arm"},
+    {"Torso",     "Left Leg"},
+    {"Torso",     "Right Leg"},
+}
+
+local function makeLine()
+    local f                      = Instance.new("Frame")
+    f.BackgroundColor3           = CFG.SkeletonColor
+    f.BackgroundTransparency     = CFG.SkeletonAlpha
+    f.BorderSizePixel            = 0
+    f.AnchorPoint                = Vector2.new(0.5, 0.5)
+    f.Visible                    = false
+    f.ZIndex                     = 2
+
+    local outline                = Instance.new("UIStroke")
+    outline.Color                = CFG.OutlineColor
+    outline.Thickness            = 0.8
+    outline.LineJoinMode         = Enum.LineJoinMode.Round
+    outline.Parent               = f
+
+    f.Parent = gui
+    return f
+end
+
+local function updateLine(line, p1, p2)
+    local delta  = p2 - p1
+    local dist   = delta.Magnitude
+    local angle  = math.deg(math.atan2(delta.Y, delta.X))
+    line.Position = UDim2.fromOffset(p1.X + delta.X * 0.5, p1.Y + delta.Y * 0.5)
+    line.Size     = UDim2.fromOffset(dist, CFG.SkeletonThick)
+    line.Rotation = angle
+    line.Visible  = true
 end
 
 local Box = {}
@@ -153,7 +211,7 @@ function Box.new(features)
             ColorSequenceKeypoint.new(0.65, Color3.fromRGB(170, 80,  0)),
             ColorSequenceKeypoint.new(1,    Color3.fromRGB(150, 0,   0)),
         })
-        grad.Rotation = 90
+        grad.Rotation = 270
         grad.Parent   = hpFill
 
         if features.healthtext then
@@ -176,6 +234,11 @@ function Box.new(features)
         end
     end
 
+    if features.skeleton then
+        self._lines     = {}
+        self._skelConns = nil
+    end
+
     self._outer.Visible  = false
     self._border.Visible = false
     self._inner.Visible  = false
@@ -183,7 +246,7 @@ function Box.new(features)
     return self
 end
 
-function Box:Update(pos, size, displayName, distance, health, maxHealth)
+function Box:Update(pos, size, displayName, distance, health, maxHealth, character)
     local x, y, w, h = pos.X, pos.Y, size.X, size.Y
     local f          = self._features
 
@@ -241,6 +304,46 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth)
             self._hpText.Visible    = fillH > 0
         end
     end
+
+    if f.skeleton and self._lines and character then
+        -- Auto-detect R15 or R6
+        local conns = character:FindFirstChild("UpperTorso") and SKELETON_R15 or SKELETON_R6
+
+        -- Grow line pool if needed
+        while #self._lines < #conns do
+            self._lines[#self._lines + 1] = makeLine()
+        end
+
+        for i, conn in ipairs(conns) do
+            local p1Part = character:FindFirstChild(conn[1])
+            local p2Part = character:FindFirstChild(conn[2])
+            local line   = self._lines[i]
+
+            if p1Part and p2Part then
+                local s1, v1 = Camera:WorldToViewportPoint(p1Part.Position)
+                local s2, v2 = Camera:WorldToViewportPoint(p2Part.Position)
+
+                if v1 and v2 then
+                    line.BackgroundColor3        = CFG.SkeletonColor
+                    line.BackgroundTransparency  = CFG.SkeletonAlpha
+                    line.Size                    = UDim2.fromOffset(
+                        (Vector2.new(s2.X, s2.Y) - Vector2.new(s1.X, s1.Y)).Magnitude,
+                        CFG.SkeletonThick
+                    )
+                    updateLine(line, Vector2.new(s1.X, s1.Y), Vector2.new(s2.X, s2.Y))
+                else
+                    line.Visible = false
+                end
+            else
+                line.Visible = false
+            end
+        end
+
+        -- Hide unused lines
+        for i = #conns + 1, #self._lines do
+            self._lines[i].Visible = false
+        end
+    end
 end
 
 function Box:Hide()
@@ -252,6 +355,9 @@ function Box:Hide()
     if self._hpBg    then self._hpBg.Visible    = false end
     if self._hpFill  then self._hpFill.Visible  = false end
     if self._hpText  then self._hpText.Visible  = false end
+    if self._lines   then
+        for _, line in ipairs(self._lines) do line.Visible = false end
+    end
 end
 
 function Box:Destroy()
@@ -263,6 +369,10 @@ function Box:Destroy()
     if self._hpBg    then self._hpBg:Destroy()    end
     if self._hpFill  then self._hpFill:Destroy()  end
     if self._hpText  then self._hpText:Destroy()  end
+    if self._lines   then
+        for _, line in ipairs(self._lines) do line:Destroy() end
+        table.clear(self._lines)
+    end
 end
 
 local OFFSETS = {
@@ -318,6 +428,7 @@ function ESP.new(features)
         distance    = features.distance    ~= false,
         healthbar   = features.healthbar   ~= false,
         healthtext  = features.healthtext  ~= false,
+        skeleton    = features.skeleton    == true,
     }
 
     if features.BorderColor    then CFG.BorderColor    = features.BorderColor    end
@@ -334,6 +445,9 @@ function ESP.new(features)
     if features.NameSize       then CFG.NameSize       = features.NameSize       end
     if features.DistSize       then CFG.DistSize       = features.DistSize       end
     if features.HealthTextSize then CFG.HealthTextSize = features.HealthTextSize end
+    if features.SkeletonColor  then CFG.SkeletonColor  = features.SkeletonColor  end
+    if features.SkeletonThick  then CFG.SkeletonThick  = features.SkeletonThick  end
+    if features.SkeletonAlpha  then CFG.SkeletonAlpha  = features.SkeletonAlpha  end
 
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
