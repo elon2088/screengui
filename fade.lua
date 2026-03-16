@@ -4,8 +4,7 @@ local Camera     = workspace.CurrentCamera
 local RunService = game:GetService("RunService")
 
 local CFG = {
-    FadeDuration = 2.5,   -- seconds to fully fade out
-    FadeSize     = Vector2.new(50, 100), -- fixed screen size of ghost box
+    FadeDuration = 2.5,
 }
 
 local fades      = {}
@@ -26,14 +25,36 @@ local function startRender()
                 table.remove(fades, i)
             else
                 local screen, vis = Camera:WorldToViewportPoint(f.worldPos)
+                local pos, size
+
                 if vis then
-                    local pos = Vector2.new(
-                        screen.X - CFG.FadeSize.X * 0.5,
-                        screen.Y - CFG.FadeSize.Y * 0.5
+                    -- player died on screen — project world pos to get position
+                    -- use last known size from when they were alive
+                    pos  = Vector2.new(
+                        screen.X - f.lastSize.X * 0.5,
+                        screen.Y - f.lastSize.Y * 0.5
                     )
-                    f.box:Update(pos, CFG.FadeSize, f.name, nil, 0, 100, nil)
+                    size = f.lastSize
+                    f.lastScreenPos = pos
+                else
+                    -- off screen — freeze at last known screen position
+                    pos  = f.lastScreenPos
+                    size = f.lastSize
+                end
+
+                if pos then
+                    f.box:Update(
+                        pos,
+                        size,
+                        f.name,
+                        f.lastDist,
+                        0,
+                        100,
+                        nil
+                    )
                     f.box:SetTransparency(t)
                 end
+
                 i = i + 1
             end
         end
@@ -45,13 +66,17 @@ local function startRender()
     end)
 end
 
-function FadeManager.trigger(box, worldPos, displayName)
+function FadeManager.trigger(box, worldPos, displayName, lastPos, lastSize, lastDist)
     box:SetTransparency(0)
     table.insert(fades, {
-        box      = box,
-        worldPos = worldPos,
-        name     = displayName,
-        elapsed  = 0,
+        box           = box,
+        worldPos      = worldPos,
+        name          = displayName,
+        lastPos       = lastPos,
+        lastSize      = lastSize,
+        lastScreenPos = lastPos,
+        lastDist      = lastDist,
+        elapsed       = 0,
     })
     startRender()
 end
