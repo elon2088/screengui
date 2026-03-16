@@ -7,6 +7,10 @@ function PlayerHandler.init(ctx)
     local Box            = ctx.Box
     local GetBoundingBox = ctx.GetBoundingBox
 
+    local FadeManager = loadstring(game:HttpGet(
+        "https://raw.githubusercontent.com/elon2088/screengui/refs/heads/main/fade.lua"
+    ))()
+
     local boxes       = {}
     local connections = {}
     local localRoot   = nil
@@ -24,19 +28,55 @@ function PlayerHandler.init(ctx)
     local function Add(player)
         if player == LocalPlayer then return end
         if boxes[player] then return end
+
         local box = Box.new()
-        boxes[player] = {
-            box  = box,
-            conn = player.CharacterAdded:Connect(function()
+        local lastRoot = nil
+
+        local deathConn = nil
+        local function setupHum(char)
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if not hum then return end
+            if deathConn then deathConn:Disconnect() end
+            deathConn = hum.Died:Connect(function()
+                local root = char:FindFirstChild("HumanoidRootPart")
+                local wp   = root and root.Position or lastRoot
+                if wp then
+                    local fadeBox = Box.new()
+                    FadeManager.trigger(fadeBox, wp, player.DisplayName)
+                end
                 box:Hide()
             end)
+        end
+
+        setupHum(player.Character)
+
+        local charConn = player.CharacterAdded:Connect(function(char)
+            box:Hide()
+            task.defer(function()
+                setupHum(char)
+            end)
+        end)
+
+        boxes[player] = {
+            box      = box,
+            charConn = charConn,
+            getRoot  = function()
+                local char = player.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if root then lastRoot = root.Position end
+                return root
+            end,
+            cleanup = function()
+                charConn:Disconnect()
+                if deathConn then deathConn:Disconnect() end
+            end
         }
     end
 
     local function Remove(player)
         local entry = boxes[player]
         if entry then
-            entry.conn:Disconnect()
+            entry.cleanup()
             entry.box:Destroy()
             boxes[player] = nil
         end
@@ -55,7 +95,7 @@ function PlayerHandler.init(ctx)
             if not char then box:Hide() continue end
 
             local hum  = char:FindFirstChildOfClass("Humanoid")
-            local root = char:FindFirstChild("HumanoidRootPart")
+            local root = entry.getRoot()
 
             if hum and hum.Health > 0 and root then
                 local pos, size = GetBoundingBox(char)
@@ -64,6 +104,7 @@ function PlayerHandler.init(ctx)
                         and (localRoot.Position - root.Position).Magnitude
                         or nil
                     box:Update(pos, size, player.DisplayName, dist, hum.Health, hum.MaxHealth, char)
+                    box:SetTransparency(0)
                 else
                     box:Hide()
                 end
@@ -77,10 +118,11 @@ function PlayerHandler.init(ctx)
         renderConn:Disconnect()
         for _, conn in ipairs(connections) do conn:Disconnect() end
         for player, entry in next, boxes do
-            entry.conn:Disconnect()
+            entry.cleanup()
             entry.box:Destroy()
             boxes[player] = nil
         end
+        FadeManager.cleanup()
     end
 end
 
