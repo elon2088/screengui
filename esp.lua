@@ -24,9 +24,6 @@ local CFG = {
     SkeletonColor  = Color3.fromRGB(255, 255, 255),
     SkeletonThick  = 1,
     SkeletonAlpha  = 0,
-    GlowColor      = Color3.fromRGB(255, 255, 255),
-    GlowAlpha      = 0.4,
-    GlowPadding    = 10,
 }
 
 local gui
@@ -123,13 +120,6 @@ local function updateLine(line, p1, p2)
     line.Visible  = true
 end
 
-local GLOW_SIDES = {
-    { rot = 180, anchor = Vector2.new(0, 1) },
-    { rot = 0,   anchor = Vector2.new(0, 0) },
-    { rot = 270, anchor = Vector2.new(1, 0) },
-    { rot = 90,  anchor = Vector2.new(0, 0) },
-}
-
 local Box = {}
 Box.__index = Box
 
@@ -138,28 +128,13 @@ function Box.new(features)
     self._features  = features
     self._smoothPct = 1
 
-    if features.glow then
-        self._glowSides = {}
-        for _, s in ipairs(GLOW_SIDES) do
-            local img                  = Instance.new("ImageLabel")
-            img.BackgroundTransparency = 1
-            img.BorderSizePixel        = 0
-            img.Image                  = "rbxassetid://14514122503"
-            img.ImageColor3            = CFG.GlowColor
-            img.ImageTransparency      = CFG.GlowAlpha
-            img.ScaleType              = Enum.ScaleType.Stretch
-            img.Rotation               = s.rot
-            img.AnchorPoint            = s.anchor
-            img.ZIndex                 = 2
-            img.Visible                = false
-            img.Parent                 = gui
-            table.insert(self._glowSides, img)
-        end
-    end
-
     self._outer  = makeFrame(gui, CFG.OutlineColor, CFG.OutlineThick)
     self._border = makeFrame(gui, CFG.BorderColor,  CFG.BorderThick)
     self._inner  = makeFrame(gui, CFG.OutlineColor, CFG.OutlineThick)
+
+    self._outerStroke = self._outer:FindFirstChildOfClass("UIStroke")
+    self._borderStroke = self._border:FindFirstChildOfClass("UIStroke")
+    self._innerStroke = self._inner:FindFirstChildOfClass("UIStroke")
 
     if features.fill then
         local fill                  = Instance.new("ImageLabel")
@@ -174,6 +149,7 @@ function Box.new(features)
         fill.ZIndex                 = self._border.ZIndex - 1
         fill.Parent                 = self._border
         self._fill                  = fill
+        self._fillBaseAlpha         = CFG.FillAlpha
     end
 
     if features.name then
@@ -273,26 +249,36 @@ function Box.new(features)
     return self
 end
 
+function Box:SetTransparency(t)
+    local t1 = math.clamp(t, 0, 1)
+    self._outerStroke.Transparency  = t1
+    self._borderStroke.Transparency = t1
+    self._innerStroke.Transparency  = t1
+    if self._fill  then self._fill.ImageTransparency  = self._fillBaseAlpha + (1 - self._fillBaseAlpha) * t1 end
+    if self._name  then
+        self._name.TextTransparency       = t1
+        self._name.TextStrokeTransparency = t1
+    end
+    if self._dist  then
+        self._dist.TextTransparency       = t1
+        self._dist.TextStrokeTransparency = t1
+    end
+    if self._hpBg   then self._hpBg.BackgroundTransparency   = t1           end
+    if self._hpFill then self._hpFill.BackgroundTransparency = t1           end
+    if self._hpText then
+        self._hpText.TextTransparency       = t1
+        self._hpText.TextStrokeTransparency = t1
+    end
+    if self._lines then
+        for _, line in ipairs(self._lines) do
+            line.BackgroundTransparency = math.clamp(CFG.SkeletonAlpha + (1 - CFG.SkeletonAlpha) * t1, 0, 1)
+        end
+    end
+end
+
 function Box:Update(pos, size, displayName, distance, health, maxHealth, character)
     local x, y, w, h = pos.X, pos.Y, size.X, size.Y
     local f          = self._features
-
-    if f.glow and self._glowSides then
-        local pad   = CFG.GlowPadding
-        local sides = self._glowSides
-        sides[1].Position = UDim2.fromOffset(x,         y - pad)
-        sides[1].Size     = UDim2.fromOffset(w,          pad)
-        sides[1].Visible  = true
-        sides[2].Position = UDim2.fromOffset(x,         y + h)
-        sides[2].Size     = UDim2.fromOffset(w,          pad)
-        sides[2].Visible  = true
-        sides[3].Position = UDim2.fromOffset(x - pad,   y)
-        sides[3].Size     = UDim2.fromOffset(pad,        h)
-        sides[3].Visible  = true
-        sides[4].Position = UDim2.fromOffset(x + w,     y)
-        sides[4].Size     = UDim2.fromOffset(pad,        h)
-        sides[4].Visible  = true
-    end
 
     self._outer.Position  = UDim2.fromOffset(x - 1, y - 1)
     self._outer.Size      = UDim2.fromOffset(w + 2,  h + 2)
@@ -384,9 +370,6 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
 end
 
 function Box:Hide()
-    if self._glowSides then
-        for _, s in ipairs(self._glowSides) do s.Visible = false end
-    end
     self._outer.Visible  = false
     self._border.Visible = false
     self._inner.Visible  = false
@@ -401,10 +384,6 @@ function Box:Hide()
 end
 
 function Box:Destroy()
-    if self._glowSides then
-        for _, s in ipairs(self._glowSides) do s:Destroy() end
-        table.clear(self._glowSides)
-    end
     self._outer:Destroy()
     self._border:Destroy()
     self._inner:Destroy()
@@ -460,9 +439,7 @@ end
 local _activeESP = nil
 
 function ESP.new(features)
-    if _activeESP then
-        _activeESP:Disable()
-    end
+    if _activeESP then _activeESP:Disable() end
 
     local self = setmetatable({}, ESP)
 
@@ -473,7 +450,6 @@ function ESP.new(features)
         healthbar   = features.healthbar   ~= false,
         healthtext  = features.healthtext  ~= false,
         skeleton    = features.skeleton    == true,
-        glow        = features.glow        == true,
     }
 
     if features.BorderColor    then CFG.BorderColor    = features.BorderColor    end
@@ -493,9 +469,6 @@ function ESP.new(features)
     if features.SkeletonColor  then CFG.SkeletonColor  = features.SkeletonColor  end
     if features.SkeletonThick  then CFG.SkeletonThick  = features.SkeletonThick  end
     if features.SkeletonAlpha  then CFG.SkeletonAlpha  = features.SkeletonAlpha  end
-    if features.GlowColor      then CFG.GlowColor      = features.GlowColor      end
-    if features.GlowAlpha      then CFG.GlowAlpha      = features.GlowAlpha      end
-    if features.GlowPadding    then CFG.GlowPadding    = features.GlowPadding    end
 
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
@@ -532,11 +505,7 @@ function ESP:Disable()
 end
 
 function ESP:Toggle()
-    if self._destroy then
-        self:Disable()
-    else
-        self:Enable()
-    end
+    if self._destroy then self:Disable() else self:Enable() end
 end
 
 function ESP:SetConfig(key, value)
