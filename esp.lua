@@ -66,7 +66,6 @@ local function makeFrame(parent, strokeColor, strokeThick)
     return f
 end
 
--- R15 and R6 skeleton connections
 local SKELETON_R15 = {
     {"Head",          "UpperTorso"},
     {"UpperTorso",    "LowerTorso"},
@@ -112,9 +111,9 @@ local function makeLine()
 end
 
 local function updateLine(line, p1, p2)
-    local delta  = p2 - p1
-    local dist   = delta.Magnitude
-    local angle  = math.deg(math.atan2(delta.Y, delta.X))
+    local delta   = p2 - p1
+    local dist    = delta.Magnitude
+    local angle   = math.deg(math.atan2(delta.Y, delta.X))
     line.Position = UDim2.fromOffset(p1.X + delta.X * 0.5, p1.Y + delta.Y * 0.5)
     line.Size     = UDim2.fromOffset(dist, CFG.SkeletonThick)
     line.Rotation = angle
@@ -128,6 +127,19 @@ function Box.new(features)
     local self      = setmetatable({}, Box)
     self._features  = features
     self._smoothPct = 1
+
+    -- Glow behind everything including health bar
+    local glow                  = Instance.new("ImageLabel")
+    glow.BackgroundTransparency = 1
+    glow.BorderSizePixel        = 0
+    glow.Image                  = "rbxassetid://14514122503"
+    glow.ImageColor3            = CFG.BorderColor
+    glow.ImageTransparency      = 0.6
+    glow.ScaleType              = Enum.ScaleType.Stretch
+    glow.ZIndex                 = 0
+    glow.Visible                = false
+    glow.Parent                 = gui
+    self._glow                  = glow
 
     self._outer  = makeFrame(gui, CFG.OutlineColor, CFG.OutlineThick)
     self._border = makeFrame(gui, CFG.BorderColor,  CFG.BorderThick)
@@ -235,8 +247,7 @@ function Box.new(features)
     end
 
     if features.skeleton then
-        self._lines     = {}
-        self._skelConns = nil
+        self._lines = {}
     end
 
     self._outer.Visible  = false
@@ -249,6 +260,11 @@ end
 function Box:Update(pos, size, displayName, distance, health, maxHealth, character)
     local x, y, w, h = pos.X, pos.Y, size.X, size.Y
     local f          = self._features
+
+    -- Glow sits 1px outside the box on all sides, behind health bar (ZIndex 0)
+    self._glow.Position = UDim2.fromOffset(x - 2, y - 2)
+    self._glow.Size     = UDim2.fromOffset(w + 4,  h + 4)
+    self._glow.Visible  = true
 
     self._outer.Position  = UDim2.fromOffset(x - 1, y - 1)
     self._outer.Size      = UDim2.fromOffset(w + 2,  h + 2)
@@ -306,10 +322,8 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     end
 
     if f.skeleton and self._lines and character then
-        -- Auto-detect R15 or R6
         local conns = character:FindFirstChild("UpperTorso") and SKELETON_R15 or SKELETON_R6
 
-        -- Grow line pool if needed
         while #self._lines < #conns do
             self._lines[#self._lines + 1] = makeLine()
         end
@@ -324,12 +338,8 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
                 local s2, v2 = Camera:WorldToViewportPoint(p2Part.Position)
 
                 if v1 and v2 then
-                    line.BackgroundColor3        = CFG.SkeletonColor
-                    line.BackgroundTransparency  = CFG.SkeletonAlpha
-                    line.Size                    = UDim2.fromOffset(
-                        (Vector2.new(s2.X, s2.Y) - Vector2.new(s1.X, s1.Y)).Magnitude,
-                        CFG.SkeletonThick
-                    )
+                    line.BackgroundColor3       = CFG.SkeletonColor
+                    line.BackgroundTransparency = CFG.SkeletonAlpha
                     updateLine(line, Vector2.new(s1.X, s1.Y), Vector2.new(s2.X, s2.Y))
                 else
                     line.Visible = false
@@ -339,7 +349,6 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
             end
         end
 
-        -- Hide unused lines
         for i = #conns + 1, #self._lines do
             self._lines[i].Visible = false
         end
@@ -347,6 +356,7 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
 end
 
 function Box:Hide()
+    self._glow.Visible   = false
     self._outer.Visible  = false
     self._border.Visible = false
     self._inner.Visible  = false
@@ -361,6 +371,7 @@ function Box:Hide()
 end
 
 function Box:Destroy()
+    self._glow:Destroy()
     self._outer:Destroy()
     self._border:Destroy()
     self._inner:Destroy()
