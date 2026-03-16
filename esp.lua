@@ -124,10 +124,10 @@ local function updateLine(line, p1, p2)
 end
 
 local GLOW_SIDES = {
-    { rot = 0,   anchor = Vector2.new(0, 1) },
-    { rot = 180, anchor = Vector2.new(0, 0) },
-    { rot = 90,  anchor = Vector2.new(1, 0) },
-    { rot = 270, anchor = Vector2.new(0, 0) },
+    { rot = 180, anchor = Vector2.new(0, 1) },  -- top
+    { rot = 0,   anchor = Vector2.new(0, 0) },  -- bottom
+    { rot = 270, anchor = Vector2.new(1, 0) },  -- left
+    { rot = 90,  anchor = Vector2.new(0, 0) },  -- right
 }
 
 local Box = {}
@@ -278,8 +278,8 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     local f          = self._features
 
     if f.glow and self._glowSides then
-        local pad    = CFG.GlowPadding
-        local sides  = self._glowSides
+        local pad   = CFG.GlowPadding
+        local sides = self._glowSides
         sides[1].Position = UDim2.fromOffset(x,     y)
         sides[1].Size     = UDim2.fromOffset(w,     pad)
         sides[1].Visible  = true
