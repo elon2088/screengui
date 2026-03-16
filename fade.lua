@@ -10,6 +10,26 @@ local CFG = {
 local fades      = {}
 local renderConn = nil
 
+local function projectCorners(corners)
+    local minX, minY =  math.huge,  math.huge
+    local maxX, maxY = -math.huge, -math.huge
+    local anyVis     = false
+
+    for _, wp in ipairs(corners) do
+        local screen, vis = Camera:WorldToViewportPoint(wp)
+        if vis then
+            anyVis = true
+            if screen.X < minX then minX = screen.X end
+            if screen.Y < minY then minY = screen.Y end
+            if screen.X > maxX then maxX = screen.X end
+            if screen.Y > maxY then maxY = screen.Y end
+        end
+    end
+
+    if not anyVis then return nil end
+    return Vector2.new(minX, minY), Vector2.new(maxX - minX, maxY - minY)
+end
+
 local function startRender()
     if renderConn then return end
     renderConn = RunService.RenderStepped:Connect(function(dt)
@@ -24,34 +44,19 @@ local function startRender()
                 f.box:Destroy()
                 table.remove(fades, i)
             else
-                local screen, vis = Camera:WorldToViewportPoint(f.worldPos)
-                local pos, size
+                -- Reproject world corners every frame for correct sizing at any distance
+                local pos, size = projectCorners(f.corners)
 
-                if vis then
-                    -- player died on screen — project world pos to get position
-                    -- use last known size from when they were alive
-                    pos  = Vector2.new(
-                        screen.X - f.lastSize.X * 0.5,
-                        screen.Y - f.lastSize.Y * 0.5
-                    )
-                    size = f.lastSize
-                    f.lastScreenPos = pos
+                if pos and size then
+                    f.lastScreenPos  = pos
+                    f.lastScreenSize = size
                 else
-                    -- off screen — freeze at last known screen position
                     pos  = f.lastScreenPos
-                    size = f.lastSize
+                    size = f.lastScreenSize
                 end
 
-                if pos then
-                    f.box:Update(
-                        pos,
-                        size,
-                        f.name,
-                        f.lastDist,
-                        0,
-                        100,
-                        nil
-                    )
+                if pos and size then
+                    f.box:Update(pos, size, f.name, f.lastDist, 0, 100, nil)
                     f.box:SetTransparency(t)
                 end
 
@@ -66,17 +71,17 @@ local function startRender()
     end)
 end
 
-function FadeManager.trigger(box, worldPos, displayName, lastPos, lastSize, lastDist)
+function FadeManager.trigger(box, worldPos, displayName, lastPos, lastSize, lastDist, corners)
     box:SetTransparency(0)
     table.insert(fades, {
-        box           = box,
-        worldPos      = worldPos,
-        name          = displayName,
-        lastPos       = lastPos,
-        lastSize      = lastSize,
-        lastScreenPos = lastPos,
-        lastDist      = lastDist,
-        elapsed       = 0,
+        box            = box,
+        worldPos       = worldPos,
+        name           = displayName,
+        lastDist       = lastDist,
+        corners        = corners,
+        lastScreenPos  = lastPos,
+        lastScreenSize = lastSize,
+        elapsed        = 0,
     })
     startRender()
 end
