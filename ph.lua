@@ -9,8 +9,7 @@ function PlayerHandler.init(ctx)
 
     local boxes       = {}
     local connections = {}
-
-    local localRoot = nil
+    local localRoot   = nil
 
     local function updateLocalRoot()
         local char = LocalPlayer.Character
@@ -18,15 +17,13 @@ function PlayerHandler.init(ctx)
     end
 
     updateLocalRoot()
-    table.insert(connections, LocalPlayer.CharacterAdded:Connect(function(char)
-                
+    table.insert(connections, LocalPlayer.CharacterAdded:Connect(function()
         task.defer(updateLocalRoot)
     end))
 
     local function Add(player)
         if player == LocalPlayer then return end
-        if boxes[player] then return end 
-
+        if boxes[player] then return end
         local box = Box.new()
         boxes[player] = {
             box  = box,
@@ -50,10 +47,7 @@ function PlayerHandler.init(ctx)
     table.insert(connections, Players.PlayerRemoving:Connect(Remove))
 
     local renderConn = RunService.RenderStepped:Connect(function()
- 
-        if not localRoot then
-            updateLocalRoot()
-        end
+        if not localRoot then updateLocalRoot() end
 
         for player, entry in next, boxes do
             local box  = entry.box
@@ -69,7 +63,7 @@ function PlayerHandler.init(ctx)
                     local dist = localRoot
                         and (localRoot.Position - root.Position).Magnitude
                         or nil
-                    box:Update(pos, size, player.DisplayName, dist, hum.Health, hum.MaxHealth)
+                    box:Update(pos, size, player.DisplayName, dist, hum.Health, hum.MaxHealth, char)
                 else
                     box:Hide()
                 end
