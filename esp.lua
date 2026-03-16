@@ -129,17 +129,35 @@ function Box.new(features)
     self._smoothPct = 1
 
     if features.glow then
-        local glow                  = Instance.new("ImageLabel")
-        glow.BackgroundTransparency = 1
-        glow.BorderSizePixel        = 0
-        glow.Image                  = "rbxassetid://14514122503"
-        glow.ImageColor3            = CFG.BorderColor
-        glow.ImageTransparency      = 0.6
-        glow.ScaleType              = Enum.ScaleType.Stretch
-        glow.ZIndex                 = 0
-        glow.Visible                = false
-        glow.Parent                 = gui
-        self._glow                  = glow
+        local glowFrame1                  = Instance.new("Frame")
+        glowFrame1.BackgroundTransparency = 1
+        glowFrame1.BorderSizePixel        = 0
+        glowFrame1.ZIndex                 = 1
+        glowFrame1.Visible                = false
+        glowFrame1.Parent                 = gui
+        self._glow                        = glowFrame1
+
+        local glowStroke1        = Instance.new("UIStroke")
+        glowStroke1.Color        = CFG.BorderColor
+        glowStroke1.Thickness    = 6
+        glowStroke1.Transparency = 0.7
+        glowStroke1.LineJoinMode = Enum.LineJoinMode.Miter
+        glowStroke1.Parent       = glowFrame1
+
+        local glowFrame2                  = Instance.new("Frame")
+        glowFrame2.BackgroundTransparency = 1
+        glowFrame2.BorderSizePixel        = 0
+        glowFrame2.ZIndex                 = 1
+        glowFrame2.Visible                = false
+        glowFrame2.Parent                 = gui
+        self._glow2                       = glowFrame2
+
+        local glowStroke2        = Instance.new("UIStroke")
+        glowStroke2.Color        = CFG.BorderColor
+        glowStroke2.Thickness    = 3
+        glowStroke2.Transparency = 0.5
+        glowStroke2.LineJoinMode = Enum.LineJoinMode.Miter
+        glowStroke2.Parent       = glowFrame2
     end
 
     self._outer  = makeFrame(gui, CFG.OutlineColor, CFG.OutlineThick)
@@ -263,9 +281,12 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     local f          = self._features
 
     if f.glow and self._glow then
-        self._glow.Position = UDim2.fromOffset(x - 2, y - 2)
-        self._glow.Size     = UDim2.fromOffset(w + 4,  h + 4)
-        self._glow.Visible  = true
+        self._glow.Position  = UDim2.fromOffset(x, y)
+        self._glow.Size      = UDim2.fromOffset(w, h)
+        self._glow.Visible   = true
+        self._glow2.Position = UDim2.fromOffset(x, y)
+        self._glow2.Size     = UDim2.fromOffset(w, h)
+        self._glow2.Visible  = true
     end
 
     self._outer.Position  = UDim2.fromOffset(x - 1, y - 1)
@@ -358,7 +379,8 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
 end
 
 function Box:Hide()
-    if self._glow   then self._glow.Visible   = false end
+    if self._glow  then self._glow.Visible  = false end
+    if self._glow2 then self._glow2.Visible = false end
     self._outer.Visible  = false
     self._border.Visible = false
     self._inner.Visible  = false
@@ -373,7 +395,8 @@ function Box:Hide()
 end
 
 function Box:Destroy()
-    if self._glow   then self._glow:Destroy()   end
+    if self._glow  then self._glow:Destroy()  end
+    if self._glow2 then self._glow2:Destroy() end
     self._outer:Destroy()
     self._border:Destroy()
     self._inner:Destroy()
