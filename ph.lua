@@ -14,7 +14,6 @@ function PlayerHandler.init(ctx)
 
     FadeManager.setConfig("FadeDuration", FadeDuration)
 
-    local Camera      = workspace.CurrentCamera
     local boxes       = {}
     local connections = {}
     local localRoot   = nil
@@ -24,15 +23,15 @@ function PlayerHandler.init(ctx)
         localRoot  = char and char:FindFirstChild("HumanoidRootPart")
     end
 
-    -- Captures all world-space part corners for accurate reprojection
+    local OFFSETS = {
+        Vector3.new( 1,  1,  1), Vector3.new(-1,  1,  1),
+        Vector3.new( 1, -1,  1), Vector3.new(-1, -1,  1),
+        Vector3.new( 1,  1, -1), Vector3.new(-1,  1, -1),
+        Vector3.new( 1, -1, -1), Vector3.new(-1, -1, -1),
+    }
+
     local function getWorldCorners(character)
         local corners = {}
-        local OFFSETS = {
-            Vector3.new( 1,  1,  1), Vector3.new(-1,  1,  1),
-            Vector3.new( 1, -1,  1), Vector3.new(-1, -1,  1),
-            Vector3.new( 1,  1, -1), Vector3.new(-1,  1, -1),
-            Vector3.new( 1, -1, -1), Vector3.new(-1, -1, -1),
-        }
         for _, part in ipairs(character:GetChildren()) do
             if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
                 local cf = part.CFrame
@@ -40,7 +39,9 @@ function PlayerHandler.init(ctx)
                 local hY = part.Size.Y * 0.5
                 local hZ = part.Size.Z * 0.5
                 for _, o in ipairs(OFFSETS) do
-                    table.insert(corners, cf * Vector3.new(o.X * hX, o.Y * hY, o.Z * hZ))
+                    table.insert(corners,
+                        cf * Vector3.new(o.X * hX, o.Y * hY, o.Z * hZ)
+                    )
                 end
             end
         end
@@ -56,24 +57,31 @@ function PlayerHandler.init(ctx)
         if player == LocalPlayer then return end
         if boxes[player] then return end
 
-        local box        = Box.new()
-        local lastPos    = nil
-        local lastSize   = nil
-        local lastDist   = nil
-        local lastRoot   = nil
-        local deathConn  = nil
+        local box           = Box.new()
+        local lastPos       = nil
+        local lastSize      = nil
+        local lastDist      = nil
+        local lastRoot      = nil
+        local lastCorners   = {}
+        local deathConn     = nil
 
         local function setupHum(char)
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             if not hum then return end
             if deathConn then deathConn:Disconnect() end
             deathConn = hum.Died:Connect(function()
-                local root    = char:FindFirstChild("HumanoidRootPart")
-                local wp      = root and root.Position or lastRoot
-                local corners = getWorldCorners(char)
-                if wp and lastPos and lastSize and #corners > 0 then
+                -- Use corners cached from last alive frame — guaranteed to exist
+                if lastPos and lastSize and #lastCorners > 0 then
                     local fadeBox = Box.new()
-                    FadeManager.trigger(fadeBox, wp, player.DisplayName, lastPos, lastSize, lastDist, corners)
+                    FadeManager.trigger(
+                        fadeBox,
+                        lastRoot,
+                        player.DisplayName,
+                        lastPos,
+                        lastSize,
+                        lastDist,
+                        lastCorners
+                    )
                 end
                 box:Hide()
             end)
@@ -83,9 +91,10 @@ function PlayerHandler.init(ctx)
 
         local charConn = player.CharacterAdded:Connect(function(char)
             box:Hide()
-            lastPos  = nil
-            lastSize = nil
-            lastDist = nil
+            lastPos     = nil
+            lastSize    = nil
+            lastDist    = nil
+            lastCorners = {}
             task.defer(function() setupHum(char) end)
         end)
 
@@ -102,7 +111,11 @@ function PlayerHandler.init(ctx)
                 local hum  = char:FindFirstChildOfClass("Humanoid")
                 local root = char:FindFirstChild("HumanoidRootPart")
 
-                if root then lastRoot = root.Position end
+                if root then
+                    lastRoot    = root.Position
+                    -- Cache corners every frame while alive
+                    lastCorners = getWorldCorners(char)
+                end
 
                 if hum and hum.Health > 0 and root then
                     local pos, size = GetBoundingBox(char)
