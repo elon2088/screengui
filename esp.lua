@@ -24,10 +24,9 @@ local CFG = {
     SkeletonColor  = Color3.fromRGB(255, 255, 255),
     SkeletonThick  = 1,
     SkeletonAlpha  = 0,
-    GlowThick1     = 6,
-    GlowThick2     = 3,
-    GlowAlpha1     = 0.7,
-    GlowAlpha2     = 0.5,
+    GlowColor      = Color3.fromRGB(255, 255, 255),
+    GlowAlpha      = 0.4,
+    GlowPadding    = 10,
 }
 
 local gui
@@ -133,35 +132,18 @@ function Box.new(features)
     self._smoothPct = 1
 
     if features.glow then
-        local glowFrame1                  = Instance.new("Frame")
-        glowFrame1.BackgroundTransparency = 1
-        glowFrame1.BorderSizePixel        = 0
-        glowFrame1.ZIndex                 = 1
-        glowFrame1.Visible                = false
-        glowFrame1.Parent                 = gui
-        self._glow                        = glowFrame1
-
-        local glowStroke1        = Instance.new("UIStroke")
-        glowStroke1.Color        = CFG.BorderColor
-        glowStroke1.Thickness    = CFG.GlowThick1
-        glowStroke1.Transparency = CFG.GlowAlpha1
-        glowStroke1.LineJoinMode = Enum.LineJoinMode.Miter
-        glowStroke1.Parent       = glowFrame1
-
-        local glowFrame2                  = Instance.new("Frame")
-        glowFrame2.BackgroundTransparency = 1
-        glowFrame2.BorderSizePixel        = 0
-        glowFrame2.ZIndex                 = 1
-        glowFrame2.Visible                = false
-        glowFrame2.Parent                 = gui
-        self._glow2                       = glowFrame2
-
-        local glowStroke2        = Instance.new("UIStroke")
-        glowStroke2.Color        = CFG.BorderColor
-        glowStroke2.Thickness    = CFG.GlowThick2
-        glowStroke2.Transparency = CFG.GlowAlpha2
-        glowStroke2.LineJoinMode = Enum.LineJoinMode.Miter
-        glowStroke2.Parent       = glowFrame2
+        local glow                  = Instance.new("ImageLabel")
+        glow.BackgroundTransparency = 1
+        glow.BorderSizePixel        = 0
+        glow.Image                  = "rbxassetid://14514122503"
+        glow.ImageColor3            = CFG.GlowColor
+        glow.ImageTransparency      = CFG.GlowAlpha
+        glow.ScaleType              = Enum.ScaleType.Slice
+        glow.SliceCenter            = Rect.new(50, 50, 50, 50)
+        glow.ZIndex                 = 2
+        glow.Visible                = false
+        glow.Parent                 = gui
+        self._glow                  = glow
     end
 
     self._outer  = makeFrame(gui, CFG.OutlineColor, CFG.OutlineThick)
@@ -285,12 +267,10 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     local f          = self._features
 
     if f.glow and self._glow then
-        self._glow.Position  = UDim2.fromOffset(x, y)
-        self._glow.Size      = UDim2.fromOffset(w, h)
-        self._glow.Visible   = true
-        self._glow2.Position = UDim2.fromOffset(x, y)
-        self._glow2.Size     = UDim2.fromOffset(w, h)
-        self._glow2.Visible  = true
+        local pad = CFG.GlowPadding
+        self._glow.Position = UDim2.fromOffset(x - pad, y - pad)
+        self._glow.Size     = UDim2.fromOffset(w + pad * 2, h + pad * 2)
+        self._glow.Visible  = true
     end
 
     self._outer.Position  = UDim2.fromOffset(x - 1, y - 1)
@@ -384,7 +364,6 @@ end
 
 function Box:Hide()
     if self._glow  then self._glow.Visible  = false end
-    if self._glow2 then self._glow2.Visible = false end
     self._outer.Visible  = false
     self._border.Visible = false
     self._inner.Visible  = false
@@ -400,7 +379,6 @@ end
 
 function Box:Destroy()
     if self._glow  then self._glow:Destroy()  end
-    if self._glow2 then self._glow2:Destroy() end
     self._outer:Destroy()
     self._border:Destroy()
     self._inner:Destroy()
@@ -489,10 +467,9 @@ function ESP.new(features)
     if features.SkeletonColor  then CFG.SkeletonColor  = features.SkeletonColor  end
     if features.SkeletonThick  then CFG.SkeletonThick  = features.SkeletonThick  end
     if features.SkeletonAlpha  then CFG.SkeletonAlpha  = features.SkeletonAlpha  end
-    if features.GlowThick1     then CFG.GlowThick1     = features.GlowThick1     end
-    if features.GlowThick2     then CFG.GlowThick2     = features.GlowThick2     end
-    if features.GlowAlpha1     then CFG.GlowAlpha1     = features.GlowAlpha1     end
-    if features.GlowAlpha2     then CFG.GlowAlpha2     = features.GlowAlpha2     end
+    if features.GlowColor      then CFG.GlowColor      = features.GlowColor      end
+    if features.GlowAlpha      then CFG.GlowAlpha      = features.GlowAlpha      end
+    if features.GlowPadding    then CFG.GlowPadding    = features.GlowPadding    end
 
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
