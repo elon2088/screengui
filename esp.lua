@@ -11,8 +11,6 @@ local CFG = {
     OutlineColor   = Color3.fromRGB(0, 0, 0),
     BorderThick    = 0.9,
     OutlineThick   = 0.9,
-    FillColor      = Color3.fromRGB(255, 255, 255),
-    FillAlpha      = 0.4,
     NameColor      = Color3.fromRGB(255, 255, 255),
     NameSize       = 12,
     DistColor      = Color3.fromRGB(255, 255, 255),
@@ -136,22 +134,6 @@ function Box.new(features)
     self._borderStroke = self._border:FindFirstChildOfClass("UIStroke")
     self._innerStroke  = self._inner:FindFirstChildOfClass("UIStroke")
 
-    if features.fill then
-        local fill                  = Instance.new("ImageLabel")
-        fill.BackgroundTransparency = 1
-        fill.BorderSizePixel        = 0
-        fill.Size                   = UDim2.fromScale(1, 1)
-        fill.Position               = UDim2.fromScale(0, 0)
-        fill.Image                  = "rbxassetid://14514122503"
-        fill.ImageColor3            = CFG.FillColor
-        fill.ImageTransparency      = CFG.FillAlpha
-        fill.ScaleType              = Enum.ScaleType.Stretch
-        fill.ZIndex                 = self._border.ZIndex - 1
-        fill.Parent                 = self._border
-        self._fill                  = fill
-        self._fillBaseAlpha         = CFG.FillAlpha
-    end
-
     if features.name then
         local name                  = Instance.new("TextLabel")
         name.BackgroundTransparency = 1
@@ -210,12 +192,13 @@ function Box.new(features)
 
         local grad    = Instance.new("UIGradient")
         grad.Color    = ColorSequence.new({
-            ColorSequenceKeypoint.new(0,    Color3.fromRGB(0,   150, 0)),
-            ColorSequenceKeypoint.new(0.35, Color3.fromRGB(100, 150, 0)),
-            ColorSequenceKeypoint.new(0.65, Color3.fromRGB(170, 80,  0)),
-            ColorSequenceKeypoint.new(1,    Color3.fromRGB(150, 0,   0)),
+            ColorSequenceKeypoint.new(0,    Color3.fromRGB(0,   180, 0)),
+            ColorSequenceKeypoint.new(0.25, Color3.fromRGB(180, 180, 0)),
+            ColorSequenceKeypoint.new(0.5,  Color3.fromRGB(200, 100, 0)),
+            ColorSequenceKeypoint.new(0.75, Color3.fromRGB(180, 30,  0)),
+            ColorSequenceKeypoint.new(1,    Color3.fromRGB(100, 0,   0)),
         })
-        grad.Rotation = 90
+        grad.Rotation = 270
         grad.Parent   = hpFill
 
         if features.healthtext then
@@ -254,9 +237,6 @@ function Box:SetTransparency(t)
     self._outerStroke.Transparency  = t1
     self._borderStroke.Transparency = t1
     self._innerStroke.Transparency  = t1
-    if self._fill then
-        self._fill.ImageTransparency = self._fillBaseAlpha + (1 - self._fillBaseAlpha) * t1
-    end
     if self._name then
         self._name.TextTransparency       = t1
         self._name.TextStrokeTransparency = t1
@@ -446,7 +426,7 @@ function ESP.new(features)
     local self = setmetatable({}, ESP)
 
     self._features = {
-        fill        = features.fill        ~= false,
+        fill        = false,
         name        = features.name        ~= false,
         distance    = features.distance    ~= false,
         healthbar   = features.healthbar   ~= false,
@@ -458,8 +438,6 @@ function ESP.new(features)
 
     if features.BorderColor    then CFG.BorderColor    = features.BorderColor    end
     if features.OutlineColor   then CFG.OutlineColor   = features.OutlineColor   end
-    if features.FillColor      then CFG.FillColor      = features.FillColor      end
-    if features.FillAlpha      then CFG.FillAlpha      = features.FillAlpha      end
     if features.NameColor      then CFG.NameColor      = features.NameColor      end
     if features.DistColor      then CFG.DistColor      = features.DistColor      end
     if features.BorderThick    then CFG.BorderThick    = features.BorderThick    end
