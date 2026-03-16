@@ -123,6 +123,13 @@ local function updateLine(line, p1, p2)
     line.Visible  = true
 end
 
+local GLOW_SIDES = {
+    { rot = 0,   anchor = Vector2.new(0, 1) },
+    { rot = 180, anchor = Vector2.new(0, 0) },
+    { rot = 90,  anchor = Vector2.new(1, 0) },
+    { rot = 270, anchor = Vector2.new(0, 0) },
+}
+
 local Box = {}
 Box.__index = Box
 
@@ -132,18 +139,22 @@ function Box.new(features)
     self._smoothPct = 1
 
     if features.glow then
-        local glow                  = Instance.new("ImageLabel")
-        glow.BackgroundTransparency = 1
-        glow.BorderSizePixel        = 0
-        glow.Image                  = "rbxassetid://14514122503"
-        glow.ImageColor3            = CFG.GlowColor
-        glow.ImageTransparency      = CFG.GlowAlpha
-        glow.ScaleType              = Enum.ScaleType.Slice
-        glow.SliceCenter            = Rect.new(50, 50, 50, 50)
-        glow.ZIndex                 = 2
-        glow.Visible                = false
-        glow.Parent                 = gui
-        self._glow                  = glow
+        self._glowSides = {}
+        for _, s in ipairs(GLOW_SIDES) do
+            local img                  = Instance.new("ImageLabel")
+            img.BackgroundTransparency = 1
+            img.BorderSizePixel        = 0
+            img.Image                  = "rbxassetid://14514122503"
+            img.ImageColor3            = CFG.GlowColor
+            img.ImageTransparency      = CFG.GlowAlpha
+            img.ScaleType              = Enum.ScaleType.Stretch
+            img.Rotation               = s.rot
+            img.AnchorPoint            = s.anchor
+            img.ZIndex                 = 2
+            img.Visible                = false
+            img.Parent                 = gui
+            table.insert(self._glowSides, img)
+        end
     end
 
     self._outer  = makeFrame(gui, CFG.OutlineColor, CFG.OutlineThick)
@@ -266,11 +277,21 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     local x, y, w, h = pos.X, pos.Y, size.X, size.Y
     local f          = self._features
 
-    if f.glow and self._glow then
-        local pad = CFG.GlowPadding
-        self._glow.Position = UDim2.fromOffset(x - pad, y - pad)
-        self._glow.Size     = UDim2.fromOffset(w + pad * 2, h + pad * 2)
-        self._glow.Visible  = true
+    if f.glow and self._glowSides then
+        local pad    = CFG.GlowPadding
+        local sides  = self._glowSides
+        sides[1].Position = UDim2.fromOffset(x,     y)
+        sides[1].Size     = UDim2.fromOffset(w,     pad)
+        sides[1].Visible  = true
+        sides[2].Position = UDim2.fromOffset(x,     y + h)
+        sides[2].Size     = UDim2.fromOffset(w,     pad)
+        sides[2].Visible  = true
+        sides[3].Position = UDim2.fromOffset(x,     y)
+        sides[3].Size     = UDim2.fromOffset(pad,   h)
+        sides[3].Visible  = true
+        sides[4].Position = UDim2.fromOffset(x + w, y)
+        sides[4].Size     = UDim2.fromOffset(pad,   h)
+        sides[4].Visible  = true
     end
 
     self._outer.Position  = UDim2.fromOffset(x - 1, y - 1)
@@ -363,7 +384,9 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
 end
 
 function Box:Hide()
-    if self._glow  then self._glow.Visible  = false end
+    if self._glowSides then
+        for _, s in ipairs(self._glowSides) do s.Visible = false end
+    end
     self._outer.Visible  = false
     self._border.Visible = false
     self._inner.Visible  = false
@@ -378,7 +401,10 @@ function Box:Hide()
 end
 
 function Box:Destroy()
-    if self._glow  then self._glow:Destroy()  end
+    if self._glowSides then
+        for _, s in ipairs(self._glowSides) do s:Destroy() end
+        table.clear(self._glowSides)
+    end
     self._outer:Destroy()
     self._border:Destroy()
     self._inner:Destroy()
