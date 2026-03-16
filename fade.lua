@@ -44,20 +44,15 @@ local function startRender()
                 f.box:Destroy()
                 table.remove(fades, i)
             else
-                -- Reproject world corners every frame for correct sizing at any distance
                 local pos, size = projectCorners(f.corners)
 
                 if pos and size then
-                    f.lastScreenPos  = pos
-                    f.lastScreenSize = size
-                else
-                    pos  = f.lastScreenPos
-                    size = f.lastScreenSize
-                end
-
-                if pos and size then
+                    -- On screen — update and show
                     f.box:Update(pos, size, f.name, f.lastDist, 0, 100, nil)
                     f.box:SetTransparency(t)
+                else
+                    -- Off screen — hide, dont freeze on screen
+                    f.box:Hide()
                 end
 
                 i = i + 1
@@ -74,14 +69,12 @@ end
 function FadeManager.trigger(box, worldPos, displayName, lastPos, lastSize, lastDist, corners)
     box:SetTransparency(0)
     table.insert(fades, {
-        box            = box,
-        worldPos       = worldPos,
-        name           = displayName,
-        lastDist       = lastDist,
-        corners        = corners,
-        lastScreenPos  = lastPos,
-        lastScreenSize = lastSize,
-        elapsed        = 0,
+        box      = box,
+        worldPos = worldPos,
+        name     = displayName,
+        lastDist = lastDist,
+        corners  = corners,
+        elapsed  = 0,
     })
     startRender()
 end
