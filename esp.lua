@@ -24,6 +24,10 @@ local CFG = {
     SkeletonColor  = Color3.fromRGB(255, 255, 255),
     SkeletonThick  = 1,
     SkeletonAlpha  = 0,
+    GlowThick1     = 6,
+    GlowThick2     = 3,
+    GlowAlpha1     = 0.7,
+    GlowAlpha2     = 0.5,
 }
 
 local gui
@@ -139,8 +143,8 @@ function Box.new(features)
 
         local glowStroke1        = Instance.new("UIStroke")
         glowStroke1.Color        = CFG.BorderColor
-        glowStroke1.Thickness    = 6
-        glowStroke1.Transparency = 0.7
+        glowStroke1.Thickness    = CFG.GlowThick1
+        glowStroke1.Transparency = CFG.GlowAlpha1
         glowStroke1.LineJoinMode = Enum.LineJoinMode.Miter
         glowStroke1.Parent       = glowFrame1
 
@@ -154,8 +158,8 @@ function Box.new(features)
 
         local glowStroke2        = Instance.new("UIStroke")
         glowStroke2.Color        = CFG.BorderColor
-        glowStroke2.Thickness    = 3
-        glowStroke2.Transparency = 0.5
+        glowStroke2.Thickness    = CFG.GlowThick2
+        glowStroke2.Transparency = CFG.GlowAlpha2
         glowStroke2.LineJoinMode = Enum.LineJoinMode.Miter
         glowStroke2.Parent       = glowFrame2
     end
@@ -485,6 +489,10 @@ function ESP.new(features)
     if features.SkeletonColor  then CFG.SkeletonColor  = features.SkeletonColor  end
     if features.SkeletonThick  then CFG.SkeletonThick  = features.SkeletonThick  end
     if features.SkeletonAlpha  then CFG.SkeletonAlpha  = features.SkeletonAlpha  end
+    if features.GlowThick1     then CFG.GlowThick1     = features.GlowThick1     end
+    if features.GlowThick2     then CFG.GlowThick2     = features.GlowThick2     end
+    if features.GlowAlpha1     then CFG.GlowAlpha1     = features.GlowAlpha1     end
+    if features.GlowAlpha2     then CFG.GlowAlpha2     = features.GlowAlpha2     end
 
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
