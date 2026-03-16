@@ -92,19 +92,19 @@ local SKELETON_R6 = {
 }
 
 local function makeLine()
-    local f                      = Instance.new("Frame")
-    f.BackgroundColor3           = CFG.SkeletonColor
-    f.BackgroundTransparency     = CFG.SkeletonAlpha
-    f.BorderSizePixel            = 0
-    f.AnchorPoint                = Vector2.new(0.5, 0.5)
-    f.Visible                    = false
-    f.ZIndex                     = 2
+    local f                  = Instance.new("Frame")
+    f.BackgroundColor3       = CFG.SkeletonColor
+    f.BackgroundTransparency = CFG.SkeletonAlpha
+    f.BorderSizePixel        = 0
+    f.AnchorPoint            = Vector2.new(0.5, 0.5)
+    f.Visible                = false
+    f.ZIndex                 = 2
 
-    local outline                = Instance.new("UIStroke")
-    outline.Color                = CFG.OutlineColor
-    outline.Thickness            = 0.8
-    outline.LineJoinMode         = Enum.LineJoinMode.Round
-    outline.Parent               = f
+    local outline            = Instance.new("UIStroke")
+    outline.Color            = CFG.OutlineColor
+    outline.Thickness        = 0.8
+    outline.LineJoinMode     = Enum.LineJoinMode.Round
+    outline.Parent           = f
 
     f.Parent = gui
     return f
@@ -128,18 +128,19 @@ function Box.new(features)
     self._features  = features
     self._smoothPct = 1
 
-    -- Glow behind everything including health bar
-    local glow                  = Instance.new("ImageLabel")
-    glow.BackgroundTransparency = 1
-    glow.BorderSizePixel        = 0
-    glow.Image                  = "rbxassetid://14514122503"
-    glow.ImageColor3            = CFG.BorderColor
-    glow.ImageTransparency      = 0.6
-    glow.ScaleType              = Enum.ScaleType.Stretch
-    glow.ZIndex                 = 0
-    glow.Visible                = false
-    glow.Parent                 = gui
-    self._glow                  = glow
+    if features.glow then
+        local glow                  = Instance.new("ImageLabel")
+        glow.BackgroundTransparency = 1
+        glow.BorderSizePixel        = 0
+        glow.Image                  = "rbxassetid://14514122503"
+        glow.ImageColor3            = CFG.BorderColor
+        glow.ImageTransparency      = 0.6
+        glow.ScaleType              = Enum.ScaleType.Stretch
+        glow.ZIndex                 = 0
+        glow.Visible                = false
+        glow.Parent                 = gui
+        self._glow                  = glow
+    end
 
     self._outer  = makeFrame(gui, CFG.OutlineColor, CFG.OutlineThick)
     self._border = makeFrame(gui, CFG.BorderColor,  CFG.BorderThick)
@@ -261,10 +262,11 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     local x, y, w, h = pos.X, pos.Y, size.X, size.Y
     local f          = self._features
 
-    -- Glow sits 1px outside the box on all sides, behind health bar (ZIndex 0)
-    self._glow.Position = UDim2.fromOffset(x - 2, y - 2)
-    self._glow.Size     = UDim2.fromOffset(w + 4,  h + 4)
-    self._glow.Visible  = true
+    if f.glow and self._glow then
+        self._glow.Position = UDim2.fromOffset(x - 2, y - 2)
+        self._glow.Size     = UDim2.fromOffset(w + 4,  h + 4)
+        self._glow.Visible  = true
+    end
 
     self._outer.Position  = UDim2.fromOffset(x - 1, y - 1)
     self._outer.Size      = UDim2.fromOffset(w + 2,  h + 2)
@@ -356,7 +358,7 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
 end
 
 function Box:Hide()
-    self._glow.Visible   = false
+    if self._glow   then self._glow.Visible   = false end
     self._outer.Visible  = false
     self._border.Visible = false
     self._inner.Visible  = false
@@ -371,7 +373,7 @@ function Box:Hide()
 end
 
 function Box:Destroy()
-    self._glow:Destroy()
+    if self._glow   then self._glow:Destroy()   end
     self._outer:Destroy()
     self._border:Destroy()
     self._inner:Destroy()
@@ -440,6 +442,7 @@ function ESP.new(features)
         healthbar   = features.healthbar   ~= false,
         healthtext  = features.healthtext  ~= false,
         skeleton    = features.skeleton    == true,
+        glow        = features.glow        == true,
     }
 
     if features.BorderColor    then CFG.BorderColor    = features.BorderColor    end
