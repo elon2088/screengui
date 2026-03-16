@@ -132,9 +132,9 @@ function Box.new(features)
     self._border = makeFrame(gui, CFG.BorderColor,  CFG.BorderThick)
     self._inner  = makeFrame(gui, CFG.OutlineColor, CFG.OutlineThick)
 
-    self._outerStroke = self._outer:FindFirstChildOfClass("UIStroke")
+    self._outerStroke  = self._outer:FindFirstChildOfClass("UIStroke")
     self._borderStroke = self._border:FindFirstChildOfClass("UIStroke")
-    self._innerStroke = self._inner:FindFirstChildOfClass("UIStroke")
+    self._innerStroke  = self._inner:FindFirstChildOfClass("UIStroke")
 
     if features.fill then
         local fill                  = Instance.new("ImageLabel")
@@ -254,17 +254,19 @@ function Box:SetTransparency(t)
     self._outerStroke.Transparency  = t1
     self._borderStroke.Transparency = t1
     self._innerStroke.Transparency  = t1
-    if self._fill  then self._fill.ImageTransparency  = self._fillBaseAlpha + (1 - self._fillBaseAlpha) * t1 end
-    if self._name  then
+    if self._fill then
+        self._fill.ImageTransparency = self._fillBaseAlpha + (1 - self._fillBaseAlpha) * t1
+    end
+    if self._name then
         self._name.TextTransparency       = t1
         self._name.TextStrokeTransparency = t1
     end
-    if self._dist  then
+    if self._dist then
         self._dist.TextTransparency       = t1
         self._dist.TextStrokeTransparency = t1
     end
-    if self._hpBg   then self._hpBg.BackgroundTransparency   = t1           end
-    if self._hpFill then self._hpFill.BackgroundTransparency = t1           end
+    if self._hpBg   then self._hpBg.BackgroundTransparency   = t1 end
+    if self._hpFill then self._hpFill.BackgroundTransparency = t1 end
     if self._hpText then
         self._hpText.TextTransparency       = t1
         self._hpText.TextStrokeTransparency = t1
@@ -452,6 +454,8 @@ function ESP.new(features)
         skeleton    = features.skeleton    == true,
     }
 
+    self._fadeDuration = features.FadeDuration or 2.5
+
     if features.BorderColor    then CFG.BorderColor    = features.BorderColor    end
     if features.OutlineColor   then CFG.OutlineColor   = features.OutlineColor   end
     if features.FillColor      then CFG.FillColor      = features.FillColor      end
@@ -491,6 +495,7 @@ function ESP:Enable()
         RunService     = RunService,
         Box            = { new = self._Box },
         GetBoundingBox = self._GetBoundingBox,
+        FadeDuration   = self._fadeDuration,
     })
 
     gui.Enabled = true
