@@ -124,10 +124,10 @@ local function updateLine(line, p1, p2)
 end
 
 local GLOW_SIDES = {
-    { rot = 180, anchor = Vector2.new(0, 1) },  -- top
-    { rot = 0,   anchor = Vector2.new(0, 0) },  -- bottom
-    { rot = 270, anchor = Vector2.new(1, 0) },  -- left
-    { rot = 90,  anchor = Vector2.new(0, 0) },  -- right
+    { rot = 180, anchor = Vector2.new(0, 1) },
+    { rot = 0,   anchor = Vector2.new(0, 0) },
+    { rot = 270, anchor = Vector2.new(1, 0) },
+    { rot = 90,  anchor = Vector2.new(0, 0) },
 }
 
 local Box = {}
@@ -280,17 +280,17 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     if f.glow and self._glowSides then
         local pad   = CFG.GlowPadding
         local sides = self._glowSides
-        sides[1].Position = UDim2.fromOffset(x,     y)
-        sides[1].Size     = UDim2.fromOffset(w,     pad)
+        sides[1].Position = UDim2.fromOffset(x,         y - pad)
+        sides[1].Size     = UDim2.fromOffset(w,          pad)
         sides[1].Visible  = true
-        sides[2].Position = UDim2.fromOffset(x,     y + h)
-        sides[2].Size     = UDim2.fromOffset(w,     pad)
+        sides[2].Position = UDim2.fromOffset(x,         y + h)
+        sides[2].Size     = UDim2.fromOffset(w,          pad)
         sides[2].Visible  = true
-        sides[3].Position = UDim2.fromOffset(x,     y)
-        sides[3].Size     = UDim2.fromOffset(pad,   h)
+        sides[3].Position = UDim2.fromOffset(x - pad,   y)
+        sides[3].Size     = UDim2.fromOffset(pad,        h)
         sides[3].Visible  = true
-        sides[4].Position = UDim2.fromOffset(x + w, y)
-        sides[4].Size     = UDim2.fromOffset(pad,   h)
+        sides[4].Position = UDim2.fromOffset(x + w,     y)
+        sides[4].Size     = UDim2.fromOffset(pad,        h)
         sides[4].Visible  = true
     end
 
