@@ -143,7 +143,7 @@ local function buildChams(character)
             clone.CanCollide          = false
             clone.CastShadow          = false
             clone.Anchored            = false
-            clone.Size                = part.Size * 1.02
+            clone.Size                = part.Size * 1
             if clone:IsA("MeshPart") then clone.TextureID = "" end
             clone.Parent              = chamsModel
 
