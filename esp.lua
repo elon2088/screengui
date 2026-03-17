@@ -132,27 +132,26 @@ local function updateLine(line, p1, p2)
 end
 
 local function buildChams(character)
-    local chamsModel       = Instance.new("Model")
-    chamsModel.Name        = "ESPChams"
-    chamsModel.Parent      = workspace
 
-    for _, part in ipairs(character:GetChildren()) do
-        if part:IsA("BasePart") then
-            local clone               = part:Clone()
-            clone:ClearAllChildren()
-            clone.CanCollide          = false
-            clone.CastShadow          = false
-            clone.Anchored            = false
-            clone.Size                = part.Size * 1
-            if clone:IsA("MeshPart") then clone.TextureID = "" end
-            clone.Parent              = chamsModel
+    local occHL               = Instance.new("Highlight")
+    occHL.Adornee             = character
+    occHL.DepthMode           = Enum.HighlightDepthMode.AlwaysOnTop
+    occHL.FillColor           = CFG.ChamOccludedColor
+    occHL.FillTransparency    = CFG.ChamOccludedAlpha
+    occHL.OutlineTransparency = CFG.ChamOutlineAlpha
+    occHL.Parent              = character
 
-            local weld                = Instance.new("WeldConstraint")
-            weld.Part0                = clone
-            weld.Part1                = part
-            weld.Parent               = clone
-        end
-    end
+
+    local losHL               = Instance.new("Highlight")
+    losHL.Adornee             = character
+    losHL.DepthMode           = Enum.HighlightDepthMode.Occluded
+    losHL.FillColor           = CFG.ChamVisibleColor
+    losHL.FillTransparency    = CFG.ChamVisibleAlpha
+    losHL.OutlineTransparency = CFG.ChamOutlineAlpha
+    losHL.Parent              = character
+
+    return nil, losHL, occHL
+end
 
     -- Visible highlight on character (occluded depthmode = only shows when NOT behind wall)
     local losHL                    = Instance.new("Highlight")
@@ -308,15 +307,15 @@ function Box:SetChams(character)
 end
 
 function Box:ClearChams()
-    if self._chamsModel then
-        pcall(function() self._chamsModel:Destroy() end)
-        self._chamsModel = nil
-    end
     if self._losHL then
         pcall(function() self._losHL:Destroy() end)
         self._losHL = nil
     end
-    self._occHL = nil
+    if self._occHL then
+        pcall(function() self._occHL:Destroy() end)
+        self._occHL = nil
+    end
+    self._chamsModel = nil
 end
 
 function Box:SetTransparency(t)
