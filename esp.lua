@@ -44,32 +44,16 @@ end
 local function healthColor(pct)
     if pct > 0.75 then
         local t = (pct - 0.75) / 0.25
-        return Color3.fromRGB(
-            math.floor(180 * (1 - t)),
-            180,
-            0
-        )
+        return Color3.fromRGB(math.floor(180 * (1 - t)), 180, 0)
     elseif pct > 0.5 then
         local t = (pct - 0.5) / 0.25
-        return Color3.fromRGB(
-            200,
-            math.floor(180 * t),
-            0
-        )
+        return Color3.fromRGB(200, math.floor(180 * t), 0)
     elseif pct > 0.25 then
         local t = (pct - 0.25) / 0.25
-        return Color3.fromRGB(
-            200,
-            math.floor(100 * t),
-            0
-        )
+        return Color3.fromRGB(200, math.floor(100 * t), 0)
     else
         local t = pct / 0.25
-        return Color3.fromRGB(
-            math.floor(100 + 80 * t),
-            0,
-            0
-        )
+        return Color3.fromRGB(math.floor(100 + 80 * t), 0, 0)
     end
 end
 
@@ -234,14 +218,14 @@ function Box.new(features)
             local hpText                  = Instance.new("TextLabel")
             hpText.BackgroundTransparency = 1
             hpText.BorderSizePixel        = 0
-            hpText.AnchorPoint            = Vector2.new(0.5, 1)
+            hpText.AnchorPoint            = Vector2.new(1, 0.5) -- right-anchored, sits left of bar
             hpText.Size                   = UDim2.new(0, 24, 0, CFG.HealthTextSize + 2)
             hpText.Font                   = Enum.Font.Code
             hpText.TextSize               = CFG.HealthTextSize
             hpText.TextColor3             = Color3.fromRGB(144, 238, 144)
             hpText.TextStrokeTransparency = 0
             hpText.TextStrokeColor3       = Color3.fromRGB(0, 0, 0)
-            hpText.TextXAlignment         = Enum.TextXAlignment.Center
+            hpText.TextXAlignment         = Enum.TextXAlignment.Right
             hpText.Text                   = ""
             hpText.Visible                = false
             hpText.ZIndex                 = self._border.ZIndex + 3
@@ -332,18 +316,19 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
         local fillH = barH * self._smoothPct
         local fillY = barY + barH - fillH
 
-        self._hpBg.Position          = UDim2.fromOffset(barX - 1, barY - 1)
-        self._hpBg.Size              = UDim2.fromOffset(barW + 2,  barH + 2)
-        self._hpBg.Visible           = true
+        self._hpBg.Position           = UDim2.fromOffset(barX - 1, barY - 1)
+        self._hpBg.Size               = UDim2.fromOffset(barW + 2,  barH + 2)
+        self._hpBg.Visible            = true
 
-        self._hpFill.Position        = UDim2.fromOffset(barX,      fillY)
-        self._hpFill.Size            = UDim2.fromOffset(barW,      fillH)
+        self._hpFill.Position         = UDim2.fromOffset(barX,      fillY)
+        self._hpFill.Size             = UDim2.fromOffset(barW,      fillH)
         self._hpFill.BackgroundColor3 = healthColor(self._smoothPct)
-        self._hpFill.Visible         = fillH > 0
+        self._hpFill.Visible          = fillH > 0
 
         if f.healthtext and self._hpText then
-            local textY = math.max(fillY, barY + CFG.HealthTextSize + 2)
-            self._hpText.Position   = UDim2.fromOffset(barX + barW * 0.5, textY)
+            -- Sits to the left of the bar, vertically centered on the fill tip
+            local tipY  = math.max(fillY, barY + CFG.HealthTextSize * 0.5)
+            self._hpText.Position   = UDim2.fromOffset(barX - 2, tipY + fillH * 0.5)
             self._hpText.Text       = tostring(health and math.ceil(health) or 0)
             self._hpText.TextColor3 = healthColor(self._smoothPct)
             self._hpText.Visible    = fillH > 0
