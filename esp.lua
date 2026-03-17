@@ -31,6 +31,9 @@ local CFG = {
     ChamOutlineAlpha   = 1,
 }
 
+local CHAM_PARAMS = RaycastParams.new()
+CHAM_PARAMS.FilterType = Enum.RaycastFilterType.Exclude
+
 local gui
 do
     local existing = (gethui and gethui() or game:GetService("CoreGui")):FindFirstChild("BoxESP")
@@ -132,23 +135,45 @@ local function updateLine(line, p1, p2)
 end
 
 local function buildChams(character)
-    local occHL               = Instance.new("Highlight")
-    occHL.Adornee             = character
-    occHL.DepthMode           = Enum.HighlightDepthMode.AlwaysOnTop
-    occHL.FillColor           = CFG.ChamOccludedColor
-    occHL.FillTransparency    = CFG.ChamOccludedAlpha
-    occHL.OutlineTransparency = CFG.ChamOutlineAlpha
-    occHL.Parent              = gui
+    local chamsModel       = Instance.new("Model")
+    chamsModel.Name        = "ESPChams"
+    chamsModel.Parent      = workspace
 
-    local losHL               = Instance.new("Highlight")
-    losHL.Adornee             = character
-    losHL.DepthMode           = Enum.HighlightDepthMode.Occluded
-    losHL.FillColor           = CFG.ChamVisibleColor
-    losHL.FillTransparency    = CFG.ChamVisibleAlpha
-    losHL.OutlineTransparency = CFG.ChamOutlineAlpha
-    losHL.Parent              = character
+    for _, part in ipairs(character:GetChildren()) do
+        if part:IsA("BasePart") then
+            local clone               = part:Clone()
+            clone:ClearAllChildren()
+            clone.CanCollide          = false
+            clone.CastShadow          = false
+            clone.Anchored            = false
+            clone.Size                = part.Size * 0.99
+            if clone:IsA("MeshPart") then clone.TextureID = "" end
+            clone.Parent              = chamsModel
 
-    return nil, losHL, occHL
+            local weld                = Instance.new("WeldConstraint")
+            weld.Part0                = clone
+            weld.Part1                = part
+            weld.Parent               = clone
+        end
+    end
+
+    local losHL                    = Instance.new("Highlight")
+    losHL.Adornee                  = character
+    losHL.DepthMode                = Enum.HighlightDepthMode.Occluded
+    losHL.FillColor                = CFG.ChamVisibleColor
+    losHL.FillTransparency         = CFG.ChamVisibleAlpha
+    losHL.OutlineTransparency      = CFG.ChamOutlineAlpha
+    losHL.Parent                   = character
+
+    local occHL                    = Instance.new("Highlight")
+    occHL.Adornee                  = chamsModel
+    occHL.DepthMode                = Enum.HighlightDepthMode.AlwaysOnTop
+    occHL.FillColor                = CFG.ChamOccludedColor
+    occHL.FillTransparency         = 1
+    occHL.OutlineTransparency      = CFG.ChamOutlineAlpha
+    occHL.Parent                   = chamsModel
+
+    return chamsModel, losHL, occHL
 end
 
 local Box = {}
@@ -263,13 +288,13 @@ function Box.new(features)
         self._lines = {}
     end
 
-    self._chamsModel = nil
-    self._losHL      = nil
-    self._occHL      = nil
-
     self._outer.Visible  = false
     self._border.Visible = false
     self._inner.Visible  = false
+
+    self._chamsModel = nil
+    self._losHL      = nil
+    self._occHL      = nil
 
     return self
 end
@@ -284,15 +309,15 @@ function Box:SetChams(character)
 end
 
 function Box:ClearChams()
+    if self._chamsModel then
+        pcall(function() self._chamsModel:Destroy() end)
+        self._chamsModel = nil
+    end
     if self._losHL then
         pcall(function() self._losHL:Destroy() end)
         self._losHL = nil
     end
-    if self._occHL then
-        pcall(function() self._occHL:Destroy() end)
-        self._occHL = nil
-    end
-    self._chamsModel = nil
+    self._occHL = nil
 end
 
 function Box:SetTransparency(t)
@@ -421,6 +446,29 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
             self._lines[i].Visible = false
         end
     end
+
+    if self._losHL and self._occHL and character then
+        local root    = character:FindFirstChild("HumanoidRootPart")
+        local visible = false
+        if root then
+            local origin = Camera.CFrame.Position
+            local dir    = root.Position - origin
+            local lchar  = LocalPlayer.Character
+            CHAM_PARAMS.FilterDescendantsInstances = lchar
+                and {character, lchar, self._chamsModel}
+                or  {character, self._chamsModel}
+            local result = workspace:Raycast(origin, dir, CHAM_PARAMS)
+            visible = result == nil
+        end
+
+        if visible then
+            self._losHL.FillTransparency = CFG.ChamVisibleAlpha
+            self._occHL.FillTransparency = 1
+        else
+            self._losHL.FillTransparency = 1
+            self._occHL.FillTransparency = CFG.ChamOccludedAlpha
+        end
+    end
 end
 
 function Box:Hide()
@@ -435,6 +483,8 @@ function Box:Hide()
     if self._lines   then
         for _, line in ipairs(self._lines) do line.Visible = false end
     end
+    if self._losHL   then self._losHL.FillTransparency = 1 end
+    if self._occHL   then self._occHL.FillTransparency = 1 end
 end
 
 function Box:Destroy()
