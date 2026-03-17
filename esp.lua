@@ -42,12 +42,34 @@ do
 end
 
 local function healthColor(pct)
-    if pct >= 0.5 then
-        local t = 1 - (pct - 0.5) / 0.5
-        return Color3.fromRGB(math.floor(255 * t), 238, math.floor(144 * (1 - t)))
+    if pct > 0.75 then
+        local t = (pct - 0.75) / 0.25
+        return Color3.fromRGB(
+            math.floor(180 * (1 - t)),
+            180,
+            0
+        )
+    elseif pct > 0.5 then
+        local t = (pct - 0.5) / 0.25
+        return Color3.fromRGB(
+            200,
+            math.floor(180 * t),
+            0
+        )
+    elseif pct > 0.25 then
+        local t = (pct - 0.25) / 0.25
+        return Color3.fromRGB(
+            200,
+            math.floor(100 * t),
+            0
+        )
     else
-        local t = pct / 0.5
-        return Color3.fromRGB(255, math.floor(200 * t), 0)
+        local t = pct / 0.25
+        return Color3.fromRGB(
+            math.floor(100 + 80 * t),
+            0,
+            0
+        )
     end
 end
 
@@ -200,24 +222,13 @@ function Box.new(features)
         self._hpBg              = hpBg
 
         local hpFill              = Instance.new("Frame")
-        hpFill.BackgroundColor3   = Color3.fromRGB(255, 255, 255)
+        hpFill.BackgroundColor3   = Color3.fromRGB(0, 180, 0)
         hpFill.BorderSizePixel    = 0
         hpFill.AnchorPoint        = Vector2.new(0, 0)
         hpFill.Visible            = false
         hpFill.ZIndex             = self._border.ZIndex + 2
         hpFill.Parent             = gui
         self._hpFill              = hpFill
-
-        local grad    = Instance.new("UIGradient")
-        grad.Color    = ColorSequence.new({
-            ColorSequenceKeypoint.new(0,    Color3.fromRGB(0,   180, 0)),
-            ColorSequenceKeypoint.new(0.25, Color3.fromRGB(180, 180, 0)),
-            ColorSequenceKeypoint.new(0.5,  Color3.fromRGB(200, 100, 0)),
-            ColorSequenceKeypoint.new(0.75, Color3.fromRGB(180, 30,  0)),
-            ColorSequenceKeypoint.new(1,    Color3.fromRGB(100, 0,   0)),
-        })
-        grad.Rotation = 270
-        grad.Parent   = hpFill
 
         if features.healthtext then
             local hpText                  = Instance.new("TextLabel")
@@ -321,13 +332,14 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
         local fillH = barH * self._smoothPct
         local fillY = barY + barH - fillH
 
-        self._hpBg.Position   = UDim2.fromOffset(barX - 1, barY - 1)
-        self._hpBg.Size       = UDim2.fromOffset(barW + 2,  barH + 2)
-        self._hpBg.Visible    = true
+        self._hpBg.Position          = UDim2.fromOffset(barX - 1, barY - 1)
+        self._hpBg.Size              = UDim2.fromOffset(barW + 2,  barH + 2)
+        self._hpBg.Visible           = true
 
-        self._hpFill.Position = UDim2.fromOffset(barX,      fillY)
-        self._hpFill.Size     = UDim2.fromOffset(barW,      fillH)
-        self._hpFill.Visible  = fillH > 0
+        self._hpFill.Position        = UDim2.fromOffset(barX,      fillY)
+        self._hpFill.Size            = UDim2.fromOffset(barW,      fillH)
+        self._hpFill.BackgroundColor3 = healthColor(self._smoothPct)
+        self._hpFill.Visible         = fillH > 0
 
         if f.healthtext and self._hpText then
             local textY = math.max(fillY, barY + CFG.HealthTextSize + 2)
