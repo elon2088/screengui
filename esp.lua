@@ -132,7 +132,6 @@ local function updateLine(line, p1, p2)
 end
 
 local function buildChams(character)
-
     local occHL               = Instance.new("Highlight")
     occHL.Adornee             = character
     occHL.DepthMode           = Enum.HighlightDepthMode.AlwaysOnTop
@@ -140,7 +139,6 @@ local function buildChams(character)
     occHL.FillTransparency    = CFG.ChamOccludedAlpha
     occHL.OutlineTransparency = CFG.ChamOutlineAlpha
     occHL.Parent              = character
-
 
     local losHL               = Instance.new("Highlight")
     losHL.Adornee             = character
@@ -151,27 +149,6 @@ local function buildChams(character)
     losHL.Parent              = character
 
     return nil, losHL, occHL
-end
-
-    -- Visible highlight on character (occluded depthmode = only shows when NOT behind wall)
-    local losHL                    = Instance.new("Highlight")
-    losHL.Adornee                  = character
-    losHL.DepthMode                = Enum.HighlightDepthMode.Occluded
-    losHL.FillColor                = CFG.ChamVisibleColor
-    losHL.FillTransparency         = CFG.ChamVisibleAlpha
-    losHL.OutlineTransparency      = CFG.ChamOutlineAlpha
-    losHL.Parent                   = character
-
-    -- Occluded highlight on clone model (always on top = shows through walls)
-    local occHL                    = Instance.new("Highlight")
-    occHL.Adornee                  = chamsModel
-    occHL.DepthMode                = Enum.HighlightDepthMode.AlwaysOnTop
-    occHL.FillColor                = CFG.ChamOccludedColor
-    occHL.FillTransparency         = CFG.ChamOccludedAlpha
-    occHL.OutlineTransparency      = CFG.ChamOutlineAlpha
-    occHL.Parent                   = chamsModel
-
-    return chamsModel, losHL, occHL
 end
 
 local Box = {}
@@ -286,13 +263,13 @@ function Box.new(features)
         self._lines = {}
     end
 
-    self._outer.Visible  = false
-    self._border.Visible = false
-    self._inner.Visible  = false
-
     self._chamsModel = nil
     self._losHL      = nil
     self._occHL      = nil
+
+    self._outer.Visible  = false
+    self._border.Visible = false
+    self._inner.Visible  = false
 
     return self
 end
@@ -346,10 +323,10 @@ function Box:SetTransparency(t)
         end
     end
     if self._losHL then
-        self._losHL.FillTransparency    = math.clamp(CFG.ChamVisibleAlpha  + (1 - CFG.ChamVisibleAlpha)  * t1, 0, 1)
+        self._losHL.FillTransparency = math.clamp(CFG.ChamVisibleAlpha  + (1 - CFG.ChamVisibleAlpha)  * t1, 0, 1)
     end
     if self._occHL then
-        self._occHL.FillTransparency    = math.clamp(CFG.ChamOccludedAlpha + (1 - CFG.ChamOccludedAlpha) * t1, 0, 1)
+        self._occHL.FillTransparency = math.clamp(CFG.ChamOccludedAlpha + (1 - CFG.ChamOccludedAlpha) * t1, 0, 1)
     end
 end
 
