@@ -26,7 +26,9 @@ local CFG = {
     SkeletonAlpha      = 0,
     ChamVisibleColor   = Color3.fromRGB(0, 150, 255),
     ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
-    ChamTransparency   = 0.5,
+    ChamVisibleAlpha   = 0,
+    ChamOccludedAlpha  = 0,
+    ChamOutlineAlpha   = 1,
 }
 
 local gui
@@ -129,8 +131,49 @@ local function updateLine(line, p1, p2)
     line.Visible  = true
 end
 
-local RAYCAST_PARAMS = RaycastParams.new()
-RAYCAST_PARAMS.FilterType = Enum.RaycastFilterType.Exclude
+local function buildChams(character)
+    local chamsModel       = Instance.new("Model")
+    chamsModel.Name        = "ESPChams"
+    chamsModel.Parent      = workspace
+
+    for _, part in ipairs(character:GetChildren()) do
+        if part:IsA("BasePart") then
+            local clone               = part:Clone()
+            clone:ClearAllChildren()
+            clone.CanCollide          = false
+            clone.CastShadow          = false
+            clone.Anchored            = false
+            clone.Size                = part.Size * 0.99
+            if clone:IsA("MeshPart") then clone.TextureID = "" end
+            clone.Parent              = chamsModel
+
+            local weld                = Instance.new("WeldConstraint")
+            weld.Part0                = clone
+            weld.Part1                = part
+            weld.Parent               = clone
+        end
+    end
+
+    -- Visible highlight on character (occluded depthmode = only shows when NOT behind wall)
+    local losHL                    = Instance.new("Highlight")
+    losHL.Adornee                  = character
+    losHL.DepthMode                = Enum.HighlightDepthMode.Occluded
+    losHL.FillColor                = CFG.ChamVisibleColor
+    losHL.FillTransparency         = CFG.ChamVisibleAlpha
+    losHL.OutlineTransparency      = CFG.ChamOutlineAlpha
+    losHL.Parent                   = character
+
+    -- Occluded highlight on clone model (always on top = shows through walls)
+    local occHL                    = Instance.new("Highlight")
+    occHL.Adornee                  = chamsModel
+    occHL.DepthMode                = Enum.HighlightDepthMode.AlwaysOnTop
+    occHL.FillColor                = CFG.ChamOccludedColor
+    occHL.FillTransparency         = CFG.ChamOccludedAlpha
+    occHL.OutlineTransparency      = CFG.ChamOutlineAlpha
+    occHL.Parent                   = chamsModel
+
+    return chamsModel, losHL, occHL
+end
 
 local Box = {}
 Box.__index = Box
@@ -244,15 +287,36 @@ function Box.new(features)
         self._lines = {}
     end
 
-    if features.chams then
-        self._chams = {}
-    end
-
     self._outer.Visible  = false
     self._border.Visible = false
     self._inner.Visible  = false
 
+    self._chamsModel = nil
+    self._losHL      = nil
+    self._occHL      = nil
+
     return self
+end
+
+function Box:SetChams(character)
+    self:ClearChams()
+    if not character then return end
+    local model, los, occ = buildChams(character)
+    self._chamsModel = model
+    self._losHL      = los
+    self._occHL      = occ
+end
+
+function Box:ClearChams()
+    if self._chamsModel then
+        pcall(function() self._chamsModel:Destroy() end)
+        self._chamsModel = nil
+    end
+    if self._losHL then
+        pcall(function() self._losHL:Destroy() end)
+        self._losHL = nil
+    end
+    self._occHL = nil
 end
 
 function Box:SetTransparency(t)
@@ -282,19 +346,11 @@ function Box:SetTransparency(t)
             line.BackgroundTransparency = math.clamp(CFG.SkeletonAlpha + (1 - CFG.SkeletonAlpha) * t1, 0, 1)
         end
     end
-    if self._chams then
-        for _, adorn in pairs(self._chams) do
-            adorn.Transparency = math.clamp(CFG.ChamTransparency + (1 - CFG.ChamTransparency) * t1, 0, 1)
-        end
+    if self._losHL then
+        self._losHL.FillTransparency    = math.clamp(CFG.ChamVisibleAlpha  + (1 - CFG.ChamVisibleAlpha)  * t1, 0, 1)
     end
-end
-
-function Box:ClearChams()
-    if self._chams then
-        for part, adorn in pairs(self._chams) do
-            pcall(function() adorn:Destroy() end)
-            self._chams[part] = nil
-        end
+    if self._occHL then
+        self._occHL.FillTransparency    = math.clamp(CFG.ChamOccludedAlpha + (1 - CFG.ChamOccludedAlpha) * t1, 0, 1)
     end
 end
 
@@ -389,49 +445,6 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
             self._lines[i].Visible = false
         end
     end
-
-    if f.chams and self._chams and character then
-        local isVisible = false
-
-        local root = character:FindFirstChild("HumanoidRootPart")
-        if root then
-            local origin = Camera.CFrame.Position
-            local dir    = root.Position - origin
-            RAYCAST_PARAMS.FilterDescendantsInstances = {character}
-            local result = workspace:Raycast(origin, dir, RAYCAST_PARAMS)
-            isVisible    = result == nil
-        end
-
-        local chamColor = f.chamsVisibleCheck
-            and (isVisible and CFG.ChamVisibleColor or CFG.ChamOccludedColor)
-            or CFG.ChamVisibleColor
-
-        local activeParts = {}
-        for _, part in ipairs(character:GetChildren()) do
-            if part:IsA("BasePart") then
-                activeParts[part] = true
-                local adorn = self._chams[part]
-                if not adorn then
-                    adorn              = Instance.new("BoxHandleAdornment")
-                    adorn.AlwaysOnTop  = true
-                    adorn.ZIndex       = 5
-                    adorn.Adornee      = part
-                    adorn.Parent       = part
-                    self._chams[part]  = adorn
-                end
-                adorn.Size         = part.Size + Vector3.new(0.02, 0.02, 0.02)
-                adorn.Color3       = chamColor
-                adorn.Transparency = CFG.ChamTransparency
-            end
-        end
-
-        for part, adorn in pairs(self._chams) do
-            if not activeParts[part] then
-                pcall(function() adorn:Destroy() end)
-                self._chams[part] = nil
-            end
-        end
-    end
 end
 
 function Box:Hide()
@@ -446,14 +459,10 @@ function Box:Hide()
     if self._lines   then
         for _, line in ipairs(self._lines) do line.Visible = false end
     end
-    if self._chams then
-        for _, adorn in pairs(self._chams) do
-            pcall(function() adorn.Transparency = 1 end)
-        end
-    end
 end
 
 function Box:Destroy()
+    self:ClearChams()
     self._outer:Destroy()
     self._border:Destroy()
     self._inner:Destroy()
@@ -465,12 +474,6 @@ function Box:Destroy()
     if self._lines   then
         for _, line in ipairs(self._lines) do line:Destroy() end
         table.clear(self._lines)
-    end
-    if self._chams then
-        for part, adorn in pairs(self._chams) do
-            pcall(function() adorn:Destroy() end)
-            self._chams[part] = nil
-        end
     end
 end
 
@@ -520,14 +523,13 @@ function ESP.new(features)
     local self = setmetatable({}, ESP)
 
     self._features = {
-        fill               = features.fill               ~= false,
-        name               = features.name               ~= false,
-        distance           = features.distance           ~= false,
-        healthbar          = features.healthbar          ~= false,
-        healthtext         = features.healthtext         ~= false,
-        skeleton           = features.skeleton           == true,
-        chams              = features.chams              == true,
-        chamsVisibleCheck  = features.chamsVisibleCheck  ~= false,
+        fill              = features.fill              ~= false,
+        name              = features.name              ~= false,
+        distance          = features.distance          ~= false,
+        healthbar         = features.healthbar         ~= false,
+        healthtext        = features.healthtext        ~= false,
+        skeleton          = features.skeleton          == true,
+        chams             = features.chams             == true,
     }
 
     self._fadeDuration = features.FadeDuration or 2.5
@@ -551,7 +553,9 @@ function ESP.new(features)
     if features.SkeletonAlpha     then CFG.SkeletonAlpha     = features.SkeletonAlpha     end
     if features.ChamVisibleColor  then CFG.ChamVisibleColor  = features.ChamVisibleColor  end
     if features.ChamOccludedColor then CFG.ChamOccludedColor = features.ChamOccludedColor end
-    if features.ChamTransparency  then CFG.ChamTransparency  = features.ChamTransparency  end
+    if features.ChamVisibleAlpha  then CFG.ChamVisibleAlpha  = features.ChamVisibleAlpha  end
+    if features.ChamOccludedAlpha then CFG.ChamOccludedAlpha = features.ChamOccludedAlpha end
+    if features.ChamOutlineAlpha  then CFG.ChamOutlineAlpha  = features.ChamOutlineAlpha  end
 
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
