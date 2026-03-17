@@ -218,7 +218,7 @@ function Box.new(features)
             local hpText                  = Instance.new("TextLabel")
             hpText.BackgroundTransparency = 1
             hpText.BorderSizePixel        = 0
-            hpText.AnchorPoint            = Vector2.new(1, 0.5) -- right-anchored, sits left of bar
+            hpText.AnchorPoint            = Vector2.new(1, 0)
             hpText.Size                   = UDim2.new(0, 24, 0, CFG.HealthTextSize + 2)
             hpText.Font                   = Enum.Font.Code
             hpText.TextSize               = CFG.HealthTextSize
@@ -326,9 +326,7 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
         self._hpFill.Visible          = fillH > 0
 
         if f.healthtext and self._hpText then
-            -- Sits to the left of the bar, vertically centered on the fill tip
-            local tipY  = math.max(fillY, barY + CFG.HealthTextSize * 0.5)
-            self._hpText.Position   = UDim2.fromOffset(barX - 2, tipY + fillH * 0.5)
+            self._hpText.Position   = UDim2.fromOffset(barX - 2, fillY)
             self._hpText.Text       = tostring(health and math.ceil(health) or 0)
             self._hpText.TextColor3 = healthColor(self._smoothPct)
             self._hpText.Visible    = fillH > 0
