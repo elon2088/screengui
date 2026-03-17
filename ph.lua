@@ -98,10 +98,11 @@ function PlayerHandler.init(ctx)
                 local isDead = not hum or hum.Health <= 0
 
                 if not isDead then
-                    wasDead        = false
+                    wasDead       = false
                     fadedThisDeath = false
 
-                    if not chamsBuilt then
+                    -- Build chams once per life
+                    if not chamsBuilt and box.SetChams then
                         box:SetChams(char)
                         chamsBuilt = true
                     end
