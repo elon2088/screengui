@@ -138,7 +138,7 @@ local function buildChams(character)
     occHL.FillColor           = CFG.ChamOccludedColor
     occHL.FillTransparency    = CFG.ChamOccludedAlpha
     occHL.OutlineTransparency = CFG.ChamOutlineAlpha
-    occHL.Parent              = character
+    occHL.Parent              = gui
 
     local losHL               = Instance.new("Highlight")
     losHL.Adornee             = character
