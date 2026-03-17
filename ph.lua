@@ -55,30 +55,33 @@ function PlayerHandler.init(ctx)
         if player == LocalPlayer then return end
         if boxes[player] then return end
 
-        local box           = Box.new()
-        local lastPos       = nil
-        local lastSize      = nil
-        local lastDist      = nil
-        local lastRoot      = nil
-        local lastCorners   = {}
-        local wasDead       = false
-        local fadedThisDeath = false
+        local box             = Box.new()
+        local lastPos         = nil
+        local lastSize        = nil
+        local lastDist        = nil
+        local lastRoot        = nil
+        local lastCorners     = {}
+        local wasDead         = false
+        local fadedThisDeath  = false
+        local chamsBuilt      = false
 
         local charConn = player.CharacterAdded:Connect(function()
             box:Hide()
-            box:ClearChams()  
+            box:ClearChams()
             lastPos          = nil
             lastSize         = nil
             lastDist         = nil
             lastCorners      = {}
             wasDead          = false
             fadedThisDeath   = false
+            chamsBuilt       = false
         end)
-        
+
         boxes[player] = {
             box     = box,
             cleanup = function()
                 charConn:Disconnect()
+                box:ClearChams()
             end,
             update  = function()
                 local char = player.Character
@@ -95,9 +98,14 @@ function PlayerHandler.init(ctx)
                 local isDead = not hum or hum.Health <= 0
 
                 if not isDead then
-                    -- Player is alive
-                    wasDead        = false
+                    wasDead       = false
                     fadedThisDeath = false
+
+                    -- Build chams once per life
+                    if not chamsBuilt and box.SetChams then
+                        box:SetChams(char)
+                        chamsBuilt = true
+                    end
 
                     local pos, size = GetBoundingBox(char)
                     if pos then
@@ -116,10 +124,11 @@ function PlayerHandler.init(ctx)
                         box:Hide()
                     end
                 else
-                    -- Player just died — trigger fade once
                     if not wasDead and not fadedThisDeath then
                         wasDead        = true
                         fadedThisDeath = true
+                        box:ClearChams()
+                        chamsBuilt = false
                         if lastPos and lastSize and #lastCorners > 0 then
                             local fadeBox = Box.new()
                             FadeManager.trigger(
