@@ -39,9 +39,7 @@ function PlayerHandler.init(ctx)
                 local hY = part.Size.Y * 0.5
                 local hZ = part.Size.Z * 0.5
                 for _, o in ipairs(OFFSETS) do
-                    table.insert(corners,
-                        cf * Vector3.new(o.X * hX, o.Y * hY, o.Z * hZ)
-                    )
+                    table.insert(corners, cf * Vector3.new(o.X * hX, o.Y * hY, o.Z * hZ))
                 end
             end
         end
@@ -63,46 +61,23 @@ function PlayerHandler.init(ctx)
         local lastDist      = nil
         local lastRoot      = nil
         local lastCorners   = {}
-        local deathConn     = nil
+        local wasDead       = false
+        local fadedThisDeath = false
 
-        local function setupHum(char)
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            if not hum then return end
-            if deathConn then deathConn:Disconnect() end
-            deathConn = hum.Died:Connect(function()
-                -- Use corners cached from last alive frame — guaranteed to exist
-                if lastPos and lastSize and #lastCorners > 0 then
-                    local fadeBox = Box.new()
-                    FadeManager.trigger(
-                        fadeBox,
-                        lastRoot,
-                        player.DisplayName,
-                        lastPos,
-                        lastSize,
-                        lastDist,
-                        lastCorners
-                    )
-                end
-                box:Hide()
-            end)
-        end
-
-        setupHum(player.Character)
-
-        local charConn = player.CharacterAdded:Connect(function(char)
+        local charConn = player.CharacterAdded:Connect(function()
             box:Hide()
-            lastPos     = nil
-            lastSize    = nil
-            lastDist    = nil
-            lastCorners = {}
-            task.defer(function() setupHum(char) end)
+            lastPos          = nil
+            lastSize         = nil
+            lastDist         = nil
+            lastCorners      = {}
+            wasDead          = false
+            fadedThisDeath   = false
         end)
 
         boxes[player] = {
             box     = box,
             cleanup = function()
                 charConn:Disconnect()
-                if deathConn then deathConn:Disconnect() end
             end,
             update  = function()
                 local char = player.Character
@@ -113,14 +88,20 @@ function PlayerHandler.init(ctx)
 
                 if root then
                     lastRoot    = root.Position
-                    -- Cache corners every frame while alive
                     lastCorners = getWorldCorners(char)
                 end
 
-                if hum and hum.Health > 0 and root then
+                local isDead = not hum or hum.Health <= 0
+
+                if not isDead then
+                    -- Player is alive
+                    wasDead        = false
+                    fadedThisDeath = false
+
                     local pos, size = GetBoundingBox(char)
                     if pos then
                         local dist = localRoot
+                            and root
                             and (localRoot.Position - root.Position).Magnitude
                             or nil
 
@@ -134,6 +115,23 @@ function PlayerHandler.init(ctx)
                         box:Hide()
                     end
                 else
+                    -- Player just died — trigger fade once
+                    if not wasDead and not fadedThisDeath then
+                        wasDead        = true
+                        fadedThisDeath = true
+                        if lastPos and lastSize and #lastCorners > 0 then
+                            local fadeBox = Box.new()
+                            FadeManager.trigger(
+                                fadeBox,
+                                lastRoot,
+                                player.DisplayName,
+                                lastPos,
+                                lastSize,
+                                lastDist,
+                                lastCorners
+                            )
+                        end
+                    end
                     box:Hide()
                 end
             end
