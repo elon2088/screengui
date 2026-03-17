@@ -66,6 +66,7 @@ function PlayerHandler.init(ctx)
 
         local charConn = player.CharacterAdded:Connect(function()
             box:Hide()
+            box:ClearChams()  
             lastPos          = nil
             lastSize         = nil
             lastDist         = nil
@@ -73,7 +74,7 @@ function PlayerHandler.init(ctx)
             wasDead          = false
             fadedThisDeath   = false
         end)
-
+        
         boxes[player] = {
             box     = box,
             cleanup = function()
