@@ -135,9 +135,11 @@ local function updateLine(line, p1, p2)
 end
 
 local function buildChams(character)
-    local chamsModel       = Instance.new("Model")
-    chamsModel.Name        = "ESPChams"
-    chamsModel.Parent      = workspace
+    local chamsModel  = Instance.new("Model")
+    chamsModel.Name   = "ESPChams"
+    chamsModel.Parent = workspace
+
+    local isR6 = character:FindFirstChild("Torso") ~= nil
 
     for _, part in ipairs(character:GetChildren()) do
         if part:IsA("BasePart") then
@@ -146,7 +148,7 @@ local function buildChams(character)
             clone.CanCollide          = false
             clone.CastShadow          = false
             clone.Anchored            = false
-            clone.Size                = part.Size * 0.99
+            clone.Size                = part.Size * (isR6 and 0.95 or 0.99)
             if clone:IsA("MeshPart") then clone.TextureID = "" end
             clone.Parent              = chamsModel
 
@@ -157,21 +159,21 @@ local function buildChams(character)
         end
     end
 
-    local losHL                    = Instance.new("Highlight")
-    losHL.Adornee                  = character
-    losHL.DepthMode                = Enum.HighlightDepthMode.Occluded
-    losHL.FillColor                = CFG.ChamVisibleColor
-    losHL.FillTransparency         = CFG.ChamVisibleAlpha
-    losHL.OutlineTransparency      = CFG.ChamOutlineAlpha
-    losHL.Parent                   = character
+    local losHL               = Instance.new("Highlight")
+    losHL.Adornee             = character
+    losHL.DepthMode           = Enum.HighlightDepthMode.Occluded
+    losHL.FillColor           = CFG.ChamVisibleColor
+    losHL.FillTransparency    = CFG.ChamVisibleAlpha
+    losHL.OutlineTransparency = CFG.ChamOutlineAlpha
+    losHL.Parent              = character
 
-    local occHL                    = Instance.new("Highlight")
-    occHL.Adornee                  = chamsModel
-    occHL.DepthMode                = Enum.HighlightDepthMode.AlwaysOnTop
-    occHL.FillColor                = CFG.ChamOccludedColor
-    occHL.FillTransparency         = 1
-    occHL.OutlineTransparency      = CFG.ChamOutlineAlpha
-    occHL.Parent                   = chamsModel
+    local occHL               = Instance.new("Highlight")
+    occHL.Adornee             = chamsModel
+    occHL.DepthMode           = Enum.HighlightDepthMode.AlwaysOnTop
+    occHL.FillColor           = CFG.ChamOccludedColor
+    occHL.FillTransparency    = 1
+    occHL.OutlineTransparency = CFG.ChamOutlineAlpha
+    occHL.Parent              = chamsModel
 
     return chamsModel, losHL, occHL
 end
