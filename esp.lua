@@ -132,25 +132,47 @@ local function updateLine(line, p1, p2)
 end
 
 local function buildChams(character)
-    -- AlwaysOnTop red — shows through walls and when visible
-    local occHL               = Instance.new("Highlight")
-    occHL.Adornee             = character
-    occHL.DepthMode           = Enum.HighlightDepthMode.AlwaysOnTop
-    occHL.FillColor           = CFG.ChamOccludedColor
-    occHL.FillTransparency    = CFG.ChamOccludedAlpha
-    occHL.OutlineTransparency = 1
-    occHL.Parent              = character
+    local chamsModel       = Instance.new("Model")
+    chamsModel.Name        = "ESPChams"
+    chamsModel.Parent      = workspace
 
-    -- Occluded blue — only shows when NOT behind wall, covers red when visible
-    local losHL               = Instance.new("Highlight")
-    losHL.Adornee             = character
-    losHL.DepthMode           = Enum.HighlightDepthMode.Occluded
-    losHL.FillColor           = CFG.ChamVisibleColor
-    losHL.FillTransparency    = CFG.ChamVisibleAlpha
-    losHL.OutlineTransparency = 1
-    losHL.Parent              = character
+    for _, part in ipairs(character:GetChildren()) do
+        if part:IsA("BasePart") then
+            local clone               = part:Clone()
+            clone:ClearAllChildren()
+            clone.CanCollide          = false
+            clone.CastShadow          = false
+            clone.Anchored            = false
+            clone.Size                = part.Size * 1.02
+            if clone:IsA("MeshPart") then clone.TextureID = "" end
+            clone.Parent              = chamsModel
 
-    return nil, losHL, occHL
+            local weld                = Instance.new("WeldConstraint")
+            weld.Part0                = clone
+            weld.Part1                = part
+            weld.Parent               = clone
+        end
+    end
+
+    -- Visible highlight on character (occluded depthmode = only shows when NOT behind wall)
+    local losHL                    = Instance.new("Highlight")
+    losHL.Adornee                  = character
+    losHL.DepthMode                = Enum.HighlightDepthMode.Occluded
+    losHL.FillColor                = CFG.ChamVisibleColor
+    losHL.FillTransparency         = CFG.ChamVisibleAlpha
+    losHL.OutlineTransparency      = CFG.ChamOutlineAlpha
+    losHL.Parent                   = character
+
+    -- Occluded highlight on clone model (always on top = shows through walls)
+    local occHL                    = Instance.new("Highlight")
+    occHL.Adornee                  = chamsModel
+    occHL.DepthMode                = Enum.HighlightDepthMode.AlwaysOnTop
+    occHL.FillColor                = CFG.ChamOccludedColor
+    occHL.FillTransparency         = CFG.ChamOccludedAlpha
+    occHL.OutlineTransparency      = CFG.ChamOutlineAlpha
+    occHL.Parent                   = chamsModel
+
+    return chamsModel, losHL, occHL
 end
 
 local Box = {}
@@ -279,21 +301,22 @@ end
 function Box:SetChams(character)
     self:ClearChams()
     if not character then return end
-    local _, los, occ = buildChams(character)
-    self._losHL = los
-    self._occHL = occ
+    local model, los, occ = buildChams(character)
+    self._chamsModel = model
+    self._losHL      = los
+    self._occHL      = occ
 end
 
 function Box:ClearChams()
+    if self._chamsModel then
+        pcall(function() self._chamsModel:Destroy() end)
+        self._chamsModel = nil
+    end
     if self._losHL then
         pcall(function() self._losHL:Destroy() end)
         self._losHL = nil
     end
-    if self._occHL then
-        pcall(function() self._occHL:Destroy() end)
-        self._occHL = nil
-    end
-    self._chamsModel = nil
+    self._occHL = nil
 end
 
 function Box:SetTransparency(t)
@@ -324,10 +347,10 @@ function Box:SetTransparency(t)
         end
     end
     if self._losHL then
-        self._losHL.FillTransparency = math.clamp(CFG.ChamVisibleAlpha  + (1 - CFG.ChamVisibleAlpha)  * t1, 0, 1)
+        self._losHL.FillTransparency    = math.clamp(CFG.ChamVisibleAlpha  + (1 - CFG.ChamVisibleAlpha)  * t1, 0, 1)
     end
     if self._occHL then
-        self._occHL.FillTransparency = math.clamp(CFG.ChamOccludedAlpha + (1 - CFG.ChamOccludedAlpha) * t1, 0, 1)
+        self._occHL.FillTransparency    = math.clamp(CFG.ChamOccludedAlpha + (1 - CFG.ChamOccludedAlpha) * t1, 0, 1)
     end
 end
 
