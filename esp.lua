@@ -28,10 +28,8 @@ local CFG = {
     ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
-    -- The glow image has its bright edge on the outer rim of the texture.
-    -- GlowOverlap = how many pixels the glow extends BEYOND the border on each side.
-    -- Tune this so the glow edge sits right on top of the box border lines.
-    GlowOverlap        = 10,
+    -- How far the glow extends INSIDE the box edges (positive = inward, negative = outward)
+    GlowInset          = 6,
 }
 
 local gui
@@ -153,8 +151,6 @@ function Box.new(features)
     self._borderStroke = self._border:FindFirstChildOfClass("UIStroke")
     self._innerStroke  = self._inner:FindFirstChildOfClass("UIStroke")
 
-    -- Glow sits just outside the border so its bright edge aligns with the box lines.
-    -- ZIndex is set ABOVE the border so it renders on top and is fully visible.
     if features.glow then
         local glow                  = Instance.new("ImageLabel")
         glow.Name                   = "glow"
@@ -162,7 +158,7 @@ function Box.new(features)
         glow.Image                  = "rbxassetid://126327713982623"
         glow.ImageColor3            = CFG.GlowColor
         glow.ImageTransparency      = 0
-        glow.ZIndex                 = self._border.ZIndex + 1
+        glow.ZIndex                 = self._border.ZIndex - 1
         glow.Visible                = false
         glow.Parent                 = gui
         self._glow                  = glow
@@ -198,7 +194,7 @@ function Box.new(features)
         name.TextXAlignment         = Enum.TextXAlignment.Center
         name.Text                   = ""
         name.Visible                = false
-        name.ZIndex                 = self._border.ZIndex + 2
+        name.ZIndex                 = self._border.ZIndex + 1
         name.Parent                 = gui
         self._name                  = name
     end
@@ -217,7 +213,7 @@ function Box.new(features)
         dist.TextXAlignment         = Enum.TextXAlignment.Center
         dist.Text                   = ""
         dist.Visible                = false
-        dist.ZIndex                 = self._border.ZIndex + 2
+        dist.ZIndex                 = self._border.ZIndex + 1
         dist.Parent                 = gui
         self._dist                  = dist
     end
@@ -227,7 +223,7 @@ function Box.new(features)
         hpBg.BackgroundColor3   = Color3.fromRGB(0, 0, 0)
         hpBg.BorderSizePixel    = 0
         hpBg.Visible            = false
-        hpBg.ZIndex             = self._border.ZIndex + 2
+        hpBg.ZIndex             = self._border.ZIndex + 1
         hpBg.Parent             = gui
         self._hpBg              = hpBg
 
@@ -236,7 +232,7 @@ function Box.new(features)
         hpFill.BorderSizePixel    = 0
         hpFill.AnchorPoint        = Vector2.new(0, 0)
         hpFill.Visible            = false
-        hpFill.ZIndex             = self._border.ZIndex + 3
+        hpFill.ZIndex             = self._border.ZIndex + 2
         hpFill.Parent             = gui
         self._hpFill              = hpFill
 
@@ -254,7 +250,7 @@ function Box.new(features)
             hpText.TextXAlignment         = Enum.TextXAlignment.Right
             hpText.Text                   = ""
             hpText.Visible                = false
-            hpText.ZIndex                 = self._border.ZIndex + 4
+            hpText.ZIndex                 = self._border.ZIndex + 3
             hpText.Parent                 = gui
             self._hpText                  = hpText
         end
@@ -337,13 +333,13 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     self._inner.Size      = UDim2.fromOffset(w - 2, h - 2)
     self._inner.Visible   = true
 
-    -- Glow extends GlowOverlap pixels beyond the border on all sides.
-    -- Its bright outer edge lands right on the border lines, fading inward.
-    -- Because ZIndex is above the border, it's always fully visible.
+    -- Glow sits inside the box edges by GlowInset pixels on each side.
+    -- Positive inset = glow is inward from the border (like image 1).
+    -- Set GlowInset to a negative number to push it outside instead.
     if self._glow then
-        local o             = CFG.GlowOverlap
-        self._glow.Position = UDim2.fromOffset(x - o, y - o)
-        self._glow.Size     = UDim2.fromOffset(w + o * 2, h + o * 2)
+        local i             = CFG.GlowInset
+        self._glow.Position = UDim2.fromOffset(x + i, y + i)
+        self._glow.Size     = UDim2.fromOffset(w - i * 2, h - i * 2)
         self._glow.Visible  = true
     end
 
@@ -589,7 +585,7 @@ function ESP.new(features)
     if features.ChamOccludedColor then CFG.ChamOccludedColor = features.ChamOccludedColor end
     if features.ChamTransparency  then CFG.ChamTransparency  = features.ChamTransparency  end
     if features.GlowColor         then CFG.GlowColor         = features.GlowColor         end
-    if features.GlowOverlap       then CFG.GlowOverlap       = features.GlowOverlap       end
+    if features.GlowInset         then CFG.GlowInset         = features.GlowInset         end
 
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
