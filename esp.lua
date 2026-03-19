@@ -29,8 +29,10 @@ local CFG = {
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
     GlowTransparency   = 0,
-    GlowScaleX         = 1.112,  -- horizontal stretch (1.0 = same width as box, higher = wider glow)
-    GlowScaleY         = 1.11,   -- vertical stretch
+    -- Fixed pixel bleed on each side of the bounding box.
+    -- These stay constant regardless of zoom / box size.
+    GlowBleedX         = 8,   -- horizontal bleed in pixels (each side)
+    GlowBleedY         = 8,   -- vertical bleed in pixels (each side)
 }
 
 local gui
@@ -168,22 +170,20 @@ function Box.new(features)
         self._fillBaseAlpha         = CFG.FillAlpha
     end
 
-    -- Glow image rendered behind the border frame.
-    -- GlowScaleX controls horizontal spread (e.g. 1.3 = 30% wider than the box on each side).
-    -- GlowScaleY controls vertical spread.
-    -- The Position offsets are calculated automatically to keep the glow centered.
+    -- Glow image parented to _border.
+    -- Size uses (1, bleedX*2) and Position uses (0, -bleedX) so the glow
+    -- always bleeds by a fixed number of pixels on each side, perfectly
+    -- hugging the bounding box at any zoom level or distance.
     if features.glow then
-        local scaleX = CFG.GlowScaleX
-        local scaleY = CFG.GlowScaleY
-        local offX   = -((scaleX - 1) * 0.5)
-        local offY   = -((scaleY - 1) * 0.5)
+        local bX = CFG.GlowBleedX
+        local bY = CFG.GlowBleedY
 
         local glow                  = Instance.new("ImageLabel")
         glow.Name                   = "Glow"
         glow.BackgroundTransparency = 1
         glow.BorderSizePixel        = 0
-        glow.Size                   = UDim2.new(scaleX, 0, scaleY, 0)
-        glow.Position               = UDim2.new(offX,   0, offY,   0)
+        glow.Size                   = UDim2.new(1, bX * 2, 1, bY * 2)
+        glow.Position               = UDim2.new(0, -bX,    0, -bY)
         glow.Image                  = "rbxassetid://4996891970"
         glow.ImageColor3            = CFG.GlowColor
         glow.ImageTransparency      = CFG.GlowTransparency
@@ -343,9 +343,9 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     self._border.Size     = UDim2.fromOffset(w, h)
     self._border.Visible  = true
 
-    -- Glow is parented to _border with scale-based UDim2, so it
-    -- auto-follows and resizes with the box every frame. Just keep
-    -- color in sync in case SetConfig("GlowColor", ...) was called.
+    -- Glow is parented to _border with a mixed UDim2 (scale + pixel offset),
+    -- so it automatically tracks the box size and stays fixed-bleed at any zoom.
+    -- Just keep color in sync in case SetConfig("GlowColor", ...) was called.
     if self._glow then
         self._glow.ImageColor3 = CFG.GlowColor
     end
@@ -596,8 +596,8 @@ function ESP.new(features)
     if features.ChamTransparency  then CFG.ChamTransparency  = features.ChamTransparency  end
     if features.GlowColor         then CFG.GlowColor         = features.GlowColor         end
     if features.GlowTransparency  then CFG.GlowTransparency  = features.GlowTransparency  end
-    if features.GlowScaleX        then CFG.GlowScaleX        = features.GlowScaleX        end
-    if features.GlowScaleY        then CFG.GlowScaleY        = features.GlowScaleY        end
+    if features.GlowBleedX        then CFG.GlowBleedX        = features.GlowBleedX        end
+    if features.GlowBleedY        then CFG.GlowBleedY        = features.GlowBleedY        end
 
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
