@@ -28,7 +28,6 @@ local CFG = {
     ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
-    GlowBrightness     = 0,  -- 0 = fully opaque (brightest), 1 = invisible
 }
 
 local gui
@@ -153,12 +152,12 @@ function Box.new(features)
     if features.glow then
         local glow                  = Instance.new("ImageLabel")
         glow.Name                   = "glow"
-        glow.Size                   = UDim2.new(1.5, 0, 1.5, 0)
-        glow.Position               = UDim2.new(-0.25, 0, -0.25, 0)
+        glow.Size                   = UDim2.new(1.112, 0, 1.11, 0)
+        glow.Position               = UDim2.new(-0.056, 0, -0.057, 0)
         glow.BackgroundTransparency = 1
         glow.Image                  = "rbxassetid://126327713982623"
         glow.ImageColor3            = CFG.GlowColor
-        glow.ImageTransparency      = CFG.GlowBrightness
+        glow.ImageTransparency      = 0
         glow.ZIndex                 = self._border.ZIndex - 1
         glow.Parent                 = self._border
         self._glow                  = glow
@@ -277,7 +276,7 @@ function Box:SetTransparency(t)
     self._borderStroke.Transparency = t1
     self._innerStroke.Transparency  = t1
     if self._glow then
-        self._glow.ImageTransparency = math.clamp(CFG.GlowBrightness + (1 - CFG.GlowBrightness) * t1, 0, 1)
+        self._glow.ImageTransparency = t1
     end
     if self._fill then
         self._fill.ImageTransparency = self._fillBaseAlpha + (1 - self._fillBaseAlpha) * t1
@@ -579,7 +578,6 @@ function ESP.new(features)
     if features.ChamOccludedColor then CFG.ChamOccludedColor = features.ChamOccludedColor end
     if features.ChamTransparency  then CFG.ChamTransparency  = features.ChamTransparency  end
     if features.GlowColor         then CFG.GlowColor         = features.GlowColor         end
-    if features.GlowBrightness    then CFG.GlowBrightness    = features.GlowBrightness    end
 
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
