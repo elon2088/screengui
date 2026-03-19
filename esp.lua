@@ -29,10 +29,8 @@ local CFG = {
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
     GlowTransparency   = 0,
-    -- Fixed pixel bleed on each side of the bounding box.
-    -- These stay constant regardless of zoom / box size.
-    GlowBleedX         = 8,   -- horizontal bleed in pixels (each side)
-    GlowBleedY         = 8,   -- vertical bleed in pixels (each side)
+    GlowBleedX         = 8,   -- fixed pixel bleed left/right (constant at all distances)
+    GlowBleedY         = 8,   -- fixed pixel bleed top/bottom (constant at all distances)
 }
 
 local gui
@@ -170,26 +168,22 @@ function Box.new(features)
         self._fillBaseAlpha         = CFG.FillAlpha
     end
 
-    -- Glow image parented to _border.
-    -- Size uses (1, bleedX*2) and Position uses (0, -bleedX) so the glow
-    -- always bleeds by a fixed number of pixels on each side, perfectly
-    -- hugging the bounding box at any zoom level or distance.
+    -- Glow is parented directly to gui (NOT to _border).
+    -- Its position and size are set manually every frame in Update()
+    -- using raw screen pixel coords + a fixed bleed, so it never
+    -- scales with the box size — it stays constant at all distances.
     if features.glow then
-        local bX = CFG.GlowBleedX
-        local bY = CFG.GlowBleedY
-
         local glow                  = Instance.new("ImageLabel")
         glow.Name                   = "Glow"
         glow.BackgroundTransparency = 1
         glow.BorderSizePixel        = 0
-        glow.Size                   = UDim2.new(1, bX * 2, 1, bY * 2)
-        glow.Position               = UDim2.new(0, -bX,    0, -bY)
         glow.Image                  = "rbxassetid://4996891970"
         glow.ImageColor3            = CFG.GlowColor
         glow.ImageTransparency      = CFG.GlowTransparency
         glow.ScaleType              = Enum.ScaleType.Stretch
         glow.ZIndex                 = self._border.ZIndex - 2
-        glow.Parent                 = self._border
+        glow.Visible                = false
+        glow.Parent                 = gui
         self._glow                  = glow
         self._glowBaseAlpha         = CFG.GlowTransparency
     end
@@ -343,16 +337,21 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     self._border.Size     = UDim2.fromOffset(w, h)
     self._border.Visible  = true
 
-    -- Glow is parented to _border with a mixed UDim2 (scale + pixel offset),
-    -- so it automatically tracks the box size and stays fixed-bleed at any zoom.
-    -- Just keep color in sync in case SetConfig("GlowColor", ...) was called.
-    if self._glow then
-        self._glow.ImageColor3 = CFG.GlowColor
-    end
-
     self._inner.Position  = UDim2.fromOffset(x + 1, y + 1)
     self._inner.Size      = UDim2.fromOffset(w - 2, h - 2)
     self._inner.Visible   = true
+
+    -- Glow: sized and positioned directly from the raw screen coords
+    -- plus a fixed pixel bleed. No scaling involved — always the same
+    -- bleed regardless of box size, zoom, or player distance.
+    if self._glow then
+        local bX = CFG.GlowBleedX
+        local bY = CFG.GlowBleedY
+        self._glow.Position    = UDim2.fromOffset(x - bX,        y - bY)
+        self._glow.Size        = UDim2.fromOffset(w + bX * 2,    h + bY * 2)
+        self._glow.ImageColor3 = CFG.GlowColor
+        self._glow.Visible     = true
+    end
 
     if f.name and self._name then
         self._name.Position = UDim2.fromOffset(x + w * 0.5, y - 2)
@@ -483,7 +482,7 @@ function Box:Hide()
     if self._hpBg    then self._hpBg.Visible    = false end
     if self._hpFill  then self._hpFill.Visible  = false end
     if self._hpText  then self._hpText.Visible  = false end
-    if self._glow    then self._glow.ImageTransparency = 1 end
+    if self._glow    then self._glow.Visible    = false end
     if self._lines   then
         for _, line in ipairs(self._lines) do line.Visible = false end
     end
@@ -496,13 +495,14 @@ end
 
 function Box:Destroy()
     self._outer:Destroy()
-    self._border:Destroy()  -- _glow is parented here, destroyed automatically
+    self._border:Destroy()
     self._inner:Destroy()
     if self._name    then self._name:Destroy()    end
     if self._dist    then self._dist:Destroy()    end
     if self._hpBg    then self._hpBg:Destroy()    end
     if self._hpFill  then self._hpFill:Destroy()  end
     if self._hpText  then self._hpText:Destroy()  end
+    if self._glow    then self._glow:Destroy()    end
     if self._lines   then
         for _, line in ipairs(self._lines) do line:Destroy() end
         table.clear(self._lines)
