@@ -156,7 +156,7 @@ function Box.new(features)
         glow.Size                   = UDim2.new(1.7, 0, 1.7, 0)
         glow.Position               = UDim2.new(-0.35, 0, -0.35, 0)
         glow.BackgroundTransparency = 1
-        glow.Image                  = "rbxassetid://94493285753759"
+        glow.Image                  = "rbxassetid://126327713982623"
         glow.ImageColor3            = CFG.GlowColor
         glow.ImageTransparency      = CFG.GlowBrightness
         glow.ZIndex                 = self._border.ZIndex - 1
