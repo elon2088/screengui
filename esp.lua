@@ -29,7 +29,7 @@ local CFG = {
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
     GlowTransparency   = 0,
-    GlowScale          = 1.112,  -- how far glow extends past box edges (higher = more spread)
+    GlowScale          = 2.5,  -- how far glow bleeds outward on all 4 sides (higher = more spread)
 }
 
 local gui
