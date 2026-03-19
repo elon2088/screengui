@@ -29,6 +29,7 @@ local CFG = {
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
     GlowTransparency   = 0,
+    GlowScale          = 1.112,  -- how far glow extends past box edges (higher = more spread)
 }
 
 local gui
@@ -167,10 +168,12 @@ function Box.new(features)
     end
 
     if features.glow then
+        local s                     = CFG.GlowScale
+        local o                     = (s - 1) / 2
         local glow                  = Instance.new("ImageLabel")
         glow.Name                   = "Glow"
-        glow.Size                   = UDim2.new(1.112, 0, 1.11, 0)
-        glow.Position               = UDim2.new(-0.056, 0, -0.057, 0)
+        glow.Size                   = UDim2.new(s, 0, s, 0)
+        glow.Position               = UDim2.new(-o, 0, -o, 0)
         glow.BackgroundTransparency = 1
         glow.Image                  = "rbxassetid://4996891970"
         glow.ImageColor3            = CFG.GlowColor
@@ -576,6 +579,7 @@ function ESP.new(features)
     if features.ChamTransparency  then CFG.ChamTransparency  = features.ChamTransparency  end
     if features.GlowColor         then CFG.GlowColor         = features.GlowColor         end
     if features.GlowTransparency  then CFG.GlowTransparency  = features.GlowTransparency  end
+    if features.GlowScale         then CFG.GlowScale         = features.GlowScale         end
 
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
