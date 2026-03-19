@@ -28,9 +28,10 @@ local CFG = {
     ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
-    GlowTransparency   = 0,        -- 0 = fully visible, 1 = hidden
-    GlowEdgeSize       = 14,       -- how thick the edge glow strips are (px)
-    GlowCornerSize     = 20,       -- size of the corner circle images (px)
+    GlowTransparency   = 0,
+    -- How many pixels the glow bleeds beyond the bounding box on each side.
+    -- Raise this to make the glow bigger/more visible.
+    GlowBleed          = 18,
 }
 
 local gui
@@ -136,49 +137,6 @@ end
 local RAYCAST_PARAMS = RaycastParams.new()
 RAYCAST_PARAMS.FilterType = Enum.RaycastFilterType.Exclude
 
--- ─── Glow helpers ────────────────────────────────────────────────────────────
-
--- Creates one edge glow strip (Frame + UIGradient).
--- rotation: 0=top, 90=right, 180=bottom, 270=left  (gradient goes outward)
-local function makeEdge(rotation)
-    local f                  = Instance.new("Frame")
-    f.BackgroundColor3       = CFG.GlowColor
-    f.BackgroundTransparency = 0
-    f.BorderSizePixel        = 0
-    f.Visible                = false
-    f.ZIndex                 = 1
-    f.Parent                 = gui
-
-    local g          = Instance.new("UIGradient")
-    g.Rotation       = rotation
-    -- centre = colour at full opacity, edges = transparent
-    g.Color          = ColorSequence.new(CFG.GlowColor)
-    g.Transparency   = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0),   -- box edge: opaque
-        NumberSequenceKeypoint.new(1, 1),   -- outer edge: transparent
-    })
-    g.Parent = f
-
-    return f, g
-end
-
--- Creates one corner glow (ImageLabel using the soft circle asset).
-local function makeCorner()
-    local img                  = Instance.new("ImageLabel")
-    img.BackgroundTransparency = 1
-    img.BorderSizePixel        = 0
-    img.Image                  = "rbxassetid://93208570840427"
-    img.ImageColor3            = CFG.GlowColor
-    img.ImageTransparency      = CFG.GlowTransparency
-    img.ScaleType              = Enum.ScaleType.Stretch
-    img.ZIndex                 = 1
-    img.Visible                = false
-    img.Parent                 = gui
-    return img
-end
-
--- ─── Box ─────────────────────────────────────────────────────────────────────
-
 local Box = {}
 Box.__index = Box
 
@@ -211,32 +169,28 @@ function Box.new(features)
         self._fillBaseAlpha         = CFG.FillAlpha
     end
 
-    -- 4 edge strips + 4 corner circles, all parented to gui so they are
-    -- positioned with raw pixel coords every frame — no parent-relative scaling.
+    -- Single sliced ImageLabel for the glow.
+    -- ScaleType.Slice keeps the corner circles intact while stretching
+    -- only the flat edges — exactly like 9-slice UI panels.
+    -- SliceCenter is set to the middle pixel so the corners take up
+    -- half the image each and the centre slice is 1px (pure stretch).
     if features.glow then
-        -- edges: top, bottom, left, right
-        -- gradient rotation: outward direction from the box edge
-        local eTop,    gTop    = makeEdge(180)   -- fades upward   (away from box)
-        local eBottom, gBottom = makeEdge(0)     -- fades downward
-        local eLeft,   gLeft   = makeEdge(270)   -- fades leftward
-        local eRight,  gRight  = makeEdge(90)    -- fades rightward
-
-        self._glowEdges = {
-            top    = { frame = eTop,    grad = gTop    },
-            bottom = { frame = eBottom, grad = gBottom },
-            left   = { frame = eLeft,   grad = gLeft   },
-            right  = { frame = eRight,  grad = gRight  },
-        }
-
-        -- corners: TL, TR, BL, BR
-        -- each corner image is rotated so the soft-circle hotspot faces outward
-        local cTL = makeCorner() ; cTL.Rotation = 180
-        local cTR = makeCorner() ; cTR.Rotation = 270
-        local cBL = makeCorner() ; cBL.Rotation = 90
-        local cBR = makeCorner() ; cBR.Rotation = 0
-
-        self._glowCorners = { TL = cTL, TR = cTR, BL = cBL, BR = cBR }
-        self._glowBaseAlpha = CFG.GlowTransparency
+        local glow                  = Instance.new("ImageLabel")
+        glow.Name                   = "Glow"
+        glow.BackgroundTransparency = 1
+        glow.BorderSizePixel        = 0
+        glow.Image                  = "rbxassetid://93208570840427"
+        glow.ImageColor3            = CFG.GlowColor
+        glow.ImageTransparency      = CFG.GlowTransparency
+        glow.ScaleType              = Enum.ScaleType.Slice
+        -- Tell Roblox where the 9-slice cuts are.
+        -- The image is a soft circle so slice at its centre on all sides.
+        glow.SliceCenter            = Rect.new(256, 256, 256, 256)
+        glow.ZIndex                 = self._border.ZIndex - 2
+        glow.Visible                = false
+        glow.Parent                 = gui
+        self._glow                  = glow
+        self._glowBaseAlpha         = CFG.GlowTransparency
     end
 
     if features.name then
@@ -330,8 +284,6 @@ function Box.new(features)
     return self
 end
 
--- ─── SetTransparency ─────────────────────────────────────────────────────────
-
 function Box:SetTransparency(t)
     local t1 = math.clamp(t, 0, 1)
     self._outerStroke.Transparency  = t1
@@ -340,14 +292,8 @@ function Box:SetTransparency(t)
     if self._fill then
         self._fill.ImageTransparency = self._fillBaseAlpha + (1 - self._fillBaseAlpha) * t1
     end
-    if self._glowEdges then
-        local alpha = math.clamp(self._glowBaseAlpha + (1 - self._glowBaseAlpha) * t1, 0, 1)
-        for _, e in pairs(self._glowEdges) do
-            e.frame.BackgroundTransparency = alpha
-        end
-        for _, c in pairs(self._glowCorners) do
-            c.ImageTransparency = alpha
-        end
+    if self._glow then
+        self._glow.ImageTransparency = math.clamp(self._glowBaseAlpha + (1 - self._glowBaseAlpha) * t1, 0, 1)
     end
     if self._name then
         self._name.TextTransparency       = t1
@@ -384,8 +330,6 @@ function Box:ClearChams()
     end
 end
 
--- ─── Update ──────────────────────────────────────────────────────────────────
-
 function Box:Update(pos, size, displayName, distance, health, maxHealth, character)
     local x, y, w, h = pos.X, pos.Y, size.X, size.Y
     local f          = self._features
@@ -402,64 +346,15 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     self._inner.Size      = UDim2.fromOffset(w - 2, h - 2)
     self._inner.Visible   = true
 
-    -- ── Glow edges + corners ─────────────────────────────────────────────────
-    if self._glowEdges then
-        local es = CFG.GlowEdgeSize
-        local cs = CFG.GlowCornerSize
-        local col = CFG.GlowColor
-
-        local edges   = self._glowEdges
-        local corners = self._glowCorners
-
-        -- Update gradient color to match CFG (in case SetConfig was called)
-        for _, e in pairs(edges) do
-            e.frame.BackgroundColor3 = col
-            e.grad.Color = ColorSequence.new(col)
-        end
-        for _, c in pairs(corners) do
-            c.ImageColor3 = col
-        end
-
-        -- TOP edge: sits above the box, full width (excluding corner slots)
-        edges.top.frame.Position = UDim2.fromOffset(x + cs,       y - es)
-        edges.top.frame.Size     = UDim2.fromOffset(w - cs * 2,   es)
-        edges.top.frame.Visible  = true
-
-        -- BOTTOM edge
-        edges.bottom.frame.Position = UDim2.fromOffset(x + cs,     y + h)
-        edges.bottom.frame.Size     = UDim2.fromOffset(w - cs * 2, es)
-        edges.bottom.frame.Visible  = true
-
-        -- LEFT edge: full height (excluding corner slots)
-        edges.left.frame.Position = UDim2.fromOffset(x - es,  y + cs)
-        edges.left.frame.Size     = UDim2.fromOffset(es,       h - cs * 2)
-        edges.left.frame.Visible  = true
-
-        -- RIGHT edge
-        edges.right.frame.Position = UDim2.fromOffset(x + w,  y + cs)
-        edges.right.frame.Size     = UDim2.fromOffset(es,      h - cs * 2)
-        edges.right.frame.Visible  = true
-
-        -- CORNERS (square image, anchored at each box corner, extending outward)
-        -- TL: extends left and up
-        corners.TL.Position = UDim2.fromOffset(x - cs,       y - cs)
-        corners.TL.Size     = UDim2.fromOffset(cs,           cs)
-        corners.TL.Visible  = true
-
-        -- TR: extends right and up
-        corners.TR.Position = UDim2.fromOffset(x + w,        y - cs)
-        corners.TR.Size     = UDim2.fromOffset(cs,           cs)
-        corners.TR.Visible  = true
-
-        -- BL: extends left and down
-        corners.BL.Position = UDim2.fromOffset(x - cs,       y + h)
-        corners.BL.Size     = UDim2.fromOffset(cs,           cs)
-        corners.BL.Visible  = true
-
-        -- BR: extends right and down
-        corners.BR.Position = UDim2.fromOffset(x + w,        y + h)
-        corners.BR.Size     = UDim2.fromOffset(cs,           cs)
-        corners.BR.Visible  = true
+    -- Glow: single 9-sliced image sized with a fixed pixel bleed on all sides.
+    -- The slice keeps the soft corner circles intact and stretches only the
+    -- flat edges — one draw call, no separate corner/edge objects.
+    if self._glow then
+        local b = CFG.GlowBleed
+        self._glow.Position    = UDim2.fromOffset(x - b,      y - b)
+        self._glow.Size        = UDim2.fromOffset(w + b * 2,  h + b * 2)
+        self._glow.ImageColor3 = CFG.GlowColor
+        self._glow.Visible     = true
     end
 
     if f.name and self._name then
@@ -582,8 +477,6 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     end
 end
 
--- ─── Hide ────────────────────────────────────────────────────────────────────
-
 function Box:Hide()
     self._outer.Visible  = false
     self._border.Visible = false
@@ -593,11 +486,8 @@ function Box:Hide()
     if self._hpBg    then self._hpBg.Visible    = false end
     if self._hpFill  then self._hpFill.Visible  = false end
     if self._hpText  then self._hpText.Visible  = false end
-    if self._glowEdges then
-        for _, e in pairs(self._glowEdges)   do e.frame.Visible = false end
-        for _, c in pairs(self._glowCorners) do c.Visible       = false end
-    end
-    if self._lines then
+    if self._glow    then self._glow.Visible    = false end
+    if self._lines   then
         for _, line in ipairs(self._lines) do line.Visible = false end
     end
     if self._chams then
@@ -606,8 +496,6 @@ function Box:Hide()
         end
     end
 end
-
--- ─── Destroy ─────────────────────────────────────────────────────────────────
 
 function Box:Destroy()
     self._outer:Destroy()
@@ -618,11 +506,8 @@ function Box:Destroy()
     if self._hpBg    then self._hpBg:Destroy()    end
     if self._hpFill  then self._hpFill:Destroy()  end
     if self._hpText  then self._hpText:Destroy()  end
-    if self._glowEdges then
-        for _, e in pairs(self._glowEdges)   do e.frame:Destroy() end
-        for _, c in pairs(self._glowCorners) do c:Destroy()       end
-    end
-    if self._lines then
+    if self._glow    then self._glow:Destroy()    end
+    if self._lines   then
         for _, line in ipairs(self._lines) do line:Destroy() end
         table.clear(self._lines)
     end
@@ -633,8 +518,6 @@ function Box:Destroy()
         end
     end
 end
-
--- ─── GetBoundingBox ──────────────────────────────────────────────────────────
 
 local OFFSETS = {
     Vector3.new( 1,  1,  1), Vector3.new(-1,  1,  1),
@@ -673,8 +556,6 @@ local function GetBoundingBox(character)
     if not valid then return nil end
     return Vector2.new(minX, minY), Vector2.new(maxX - minX, maxY - minY)
 end
-
--- ─── ESP ─────────────────────────────────────────────────────────────────────
 
 local _activeESP = nil
 
@@ -719,8 +600,7 @@ function ESP.new(features)
     if features.ChamTransparency  then CFG.ChamTransparency  = features.ChamTransparency  end
     if features.GlowColor         then CFG.GlowColor         = features.GlowColor         end
     if features.GlowTransparency  then CFG.GlowTransparency  = features.GlowTransparency  end
-    if features.GlowEdgeSize      then CFG.GlowEdgeSize      = features.GlowEdgeSize      end
-    if features.GlowCornerSize    then CFG.GlowCornerSize    = features.GlowCornerSize    end
+    if features.GlowBleed         then CFG.GlowBleed         = features.GlowBleed         end
 
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
