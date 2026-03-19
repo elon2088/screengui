@@ -28,7 +28,9 @@ local CFG = {
     ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
-    GlowPadScale       = 0.10, -- pad = h * this, consistent regardless of box width
+    GlowPadScale       = 0.9,   -- inner glow pad = h * this
+    GlowPadScale2      = 0.9,   -- outer glow pad = h * this (larger = further out)
+    GlowAlpha2         = 0,   -- outer glow is slightly more transparent
 }
 
 local gui
@@ -75,6 +77,19 @@ local function makeFrame(parent, strokeColor, strokeThick)
     s.Parent       = f
 
     return f
+end
+
+local function makeGlow(zIndex, alpha)
+    local glow                  = Instance.new("ImageLabel")
+    glow.Name                   = "glow"
+    glow.BackgroundTransparency = 1
+    glow.Image                  = "rbxassetid://126327713982623"
+    glow.ImageColor3            = CFG.GlowColor
+    glow.ImageTransparency      = alpha or 0
+    glow.ZIndex                 = zIndex
+    glow.Visible                = false
+    glow.Parent                 = gui
+    return glow
 end
 
 local SKELETON_R15 = {
@@ -151,16 +166,10 @@ function Box.new(features)
     self._innerStroke  = self._inner:FindFirstChildOfClass("UIStroke")
 
     if features.glow then
-        local glow                  = Instance.new("ImageLabel")
-        glow.Name                   = "glow"
-        glow.BackgroundTransparency = 1
-        glow.Image                  = "rbxassetid://126327713982623"
-        glow.ImageColor3            = CFG.GlowColor
-        glow.ImageTransparency      = 0
-        glow.ZIndex                 = self._border.ZIndex - 1
-        glow.Visible                = false
-        glow.Parent                 = gui
-        self._glow                  = glow
+        -- Inner glow (closer to the box, fully opaque)
+        self._glow  = makeGlow(self._border.ZIndex - 1, 0)
+        -- Outer glow (further out, slightly transparent for a soft falloff)
+        self._glow2 = makeGlow(self._border.ZIndex - 2, CFG.GlowAlpha2)
     end
 
     if features.fill then
@@ -270,13 +279,25 @@ function Box.new(features)
     return self
 end
 
+local function applyGlowPos(glow, x, y, w, h, padScale)
+    local pad   = math.max(4, h * padScale)
+    local inset = pad * 0.18
+    glow.Position = UDim2.fromOffset(x - pad + inset, y - pad + inset)
+    glow.Size     = UDim2.fromOffset(w + (pad - inset) * 2, h + (pad - inset) * 2)
+    glow.Visible  = true
+end
+
 function Box:SetTransparency(t)
     local t1 = math.clamp(t, 0, 1)
     self._outerStroke.Transparency  = t1
     self._borderStroke.Transparency = t1
     self._innerStroke.Transparency  = t1
     if self._glow then
-        self._glow.ImageTransparency = t1
+        self._glow.ImageTransparency  = t1
+    end
+    if self._glow2 then
+        -- outer glow fades from its base alpha, not from 0
+        self._glow2.ImageTransparency = CFG.GlowAlpha2 + (1 - CFG.GlowAlpha2) * t1
     end
     if self._fill then
         self._fill.ImageTransparency = self._fillBaseAlpha + (1 - self._fillBaseAlpha) * t1
@@ -332,15 +353,8 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     self._inner.Size      = UDim2.fromOffset(w - 2, h - 2)
     self._inner.Visible   = true
 
-    -- Glow: pad is based on h only so it stays consistent when the box is narrow (side angle).
-    -- The glow image asset has ~8% internal padding baked in, so we compensate with a small inset.
-    if self._glow then
-        local pad    = math.max(4, h * CFG.GlowPadScale)
-        local inset  = pad * 0.18  -- compensates for the texture's built-in transparent border
-        self._glow.Position = UDim2.fromOffset(x - pad + inset, y - pad + inset)
-        self._glow.Size     = UDim2.fromOffset(w + (pad - inset) * 2, h + (pad - inset) * 2)
-        self._glow.Visible  = true
-    end
+    if self._glow  then applyGlowPos(self._glow,  x, y, w, h, CFG.GlowPadScale)  end
+    if self._glow2 then applyGlowPos(self._glow2, x, y, w, h, CFG.GlowPadScale2) end
 
     if f.name and self._name then
         self._name.Position = UDim2.fromOffset(x + w * 0.5, y - 2)
@@ -467,6 +481,7 @@ function Box:Hide()
     self._border.Visible = false
     self._inner.Visible  = false
     if self._glow    then self._glow.Visible    = false end
+    if self._glow2   then self._glow2.Visible   = false end
     if self._name    then self._name.Visible    = false end
     if self._dist    then self._dist.Visible    = false end
     if self._hpBg    then self._hpBg.Visible    = false end
@@ -487,6 +502,7 @@ function Box:Destroy()
     self._border:Destroy()
     self._inner:Destroy()
     if self._glow    then self._glow:Destroy()    end
+    if self._glow2   then self._glow2:Destroy()   end
     if self._name    then self._name:Destroy()    end
     if self._dist    then self._dist:Destroy()    end
     if self._hpBg    then self._hpBg:Destroy()    end
@@ -585,6 +601,8 @@ function ESP.new(features)
     if features.ChamTransparency  then CFG.ChamTransparency  = features.ChamTransparency  end
     if features.GlowColor         then CFG.GlowColor         = features.GlowColor         end
     if features.GlowPadScale      then CFG.GlowPadScale      = features.GlowPadScale      end
+    if features.GlowPadScale2     then CFG.GlowPadScale2     = features.GlowPadScale2     end
+    if features.GlowAlpha2        then CFG.GlowAlpha2        = features.GlowAlpha2        end
 
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
