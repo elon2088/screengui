@@ -27,6 +27,8 @@ local CFG = {
     ChamVisibleColor   = Color3.fromRGB(0, 150, 255),
     ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
     ChamTransparency   = 0.5,
+    GlowColor          = Color3.fromRGB(202, 243, 255),
+    GlowTransparency   = 0,
 }
 
 local gui
@@ -164,6 +166,21 @@ function Box.new(features)
         self._fillBaseAlpha         = CFG.FillAlpha
     end
 
+    if features.glow then
+        local glow                  = Instance.new("ImageLabel")
+        glow.Name                   = "Glow"
+        glow.Size                   = UDim2.new(1.112, 0, 1.11, 0)
+        glow.Position               = UDim2.new(-0.056, 0, -0.057, 0)
+        glow.BackgroundTransparency = 1
+        glow.Image                  = "rbxassetid://4996891970"
+        glow.ImageColor3            = CFG.GlowColor
+        glow.ImageTransparency      = CFG.GlowTransparency
+        glow.ZIndex                 = self._border.ZIndex - 2
+        glow.Parent                 = self._border
+        self._glow                  = glow
+        self._glowBaseAlpha         = CFG.GlowTransparency
+    end
+
     if features.name then
         local name                  = Instance.new("TextLabel")
         name.BackgroundTransparency = 1
@@ -262,6 +279,9 @@ function Box:SetTransparency(t)
     self._innerStroke.Transparency  = t1
     if self._fill then
         self._fill.ImageTransparency = self._fillBaseAlpha + (1 - self._fillBaseAlpha) * t1
+    end
+    if self._glow then
+        self._glow.ImageTransparency = math.clamp(self._glowBaseAlpha + (1 - self._glowBaseAlpha) * t1, 0, 1)
     end
     if self._name then
         self._name.TextTransparency       = t1
@@ -443,6 +463,7 @@ function Box:Hide()
     if self._hpBg    then self._hpBg.Visible    = false end
     if self._hpFill  then self._hpFill.Visible  = false end
     if self._hpText  then self._hpText.Visible  = false end
+    if self._glow    then self._glow.ImageTransparency = 1 end
     if self._lines   then
         for _, line in ipairs(self._lines) do line.Visible = false end
     end
@@ -528,6 +549,7 @@ function ESP.new(features)
         skeleton           = features.skeleton           == true,
         chams              = features.chams              == true,
         chamsVisibleCheck  = features.chamsVisibleCheck  ~= false,
+        glow               = features.glow               == true,
     }
 
     self._fadeDuration = features.FadeDuration or 2.5
@@ -552,6 +574,8 @@ function ESP.new(features)
     if features.ChamVisibleColor  then CFG.ChamVisibleColor  = features.ChamVisibleColor  end
     if features.ChamOccludedColor then CFG.ChamOccludedColor = features.ChamOccludedColor end
     if features.ChamTransparency  then CFG.ChamTransparency  = features.ChamTransparency  end
+    if features.GlowColor         then CFG.GlowColor         = features.GlowColor         end
+    if features.GlowTransparency  then CFG.GlowTransparency  = features.GlowTransparency  end
 
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
