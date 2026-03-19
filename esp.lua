@@ -28,10 +28,6 @@ local CFG = {
     ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
-    GlowTransparency   = 0,
-    -- How many pixels the glow bleeds beyond the bounding box on each side.
-    -- Raise this to make the glow bigger/more visible.
-    GlowBleed          = 18,
 }
 
 local gui
@@ -153,6 +149,20 @@ function Box.new(features)
     self._borderStroke = self._border:FindFirstChildOfClass("UIStroke")
     self._innerStroke  = self._inner:FindFirstChildOfClass("UIStroke")
 
+    if features.glow then
+        local glow                  = Instance.new("ImageLabel")
+        glow.Name                   = "glow"
+        glow.Size                   = UDim2.new(1.112, 0, 1.11, 0)
+        glow.Position               = UDim2.new(-0.056, 0, -0.057, 0)
+        glow.BackgroundTransparency = 1
+        glow.Image                  = "rbxassetid://126327713982623"
+        glow.ImageColor3            = CFG.GlowColor
+        glow.ImageTransparency      = 0
+        glow.ZIndex                 = self._border.ZIndex - 1
+        glow.Parent                 = self._border
+        self._glow                  = glow
+    end
+
     if features.fill then
         local fill                  = Instance.new("ImageLabel")
         fill.BackgroundTransparency = 1
@@ -167,30 +177,6 @@ function Box.new(features)
         fill.Parent                 = self._border
         self._fill                  = fill
         self._fillBaseAlpha         = CFG.FillAlpha
-    end
-
-    -- Single sliced ImageLabel for the glow.
-    -- ScaleType.Slice keeps the corner circles intact while stretching
-    -- only the flat edges — exactly like 9-slice UI panels.
-    -- SliceCenter is set to the middle pixel so the corners take up
-    -- half the image each and the centre slice is 1px (pure stretch).
-    if features.glow then
-        local glow                  = Instance.new("ImageLabel")
-        glow.Name                   = "Glow"
-        glow.BackgroundTransparency = 1
-        glow.BorderSizePixel        = 0
-        glow.Image                  = "rbxassetid://126327713982623"
-        glow.ImageColor3            = CFG.GlowColor
-        glow.ImageTransparency      = CFG.GlowTransparency
-        glow.ScaleType              = Enum.ScaleType.Slice
-        -- Tell Roblox where the 9-slice cuts are.
-        -- The image is a soft circle so slice at its centre on all sides.
-        glow.SliceCenter            = Rect.new(256, 256, 256, 256)  -- assumes 512x512 image; adjust if your image is a different size
-        glow.ZIndex                 = self._border.ZIndex - 2
-        glow.Visible                = false
-        glow.Parent                 = gui
-        self._glow                  = glow
-        self._glowBaseAlpha         = CFG.GlowTransparency
     end
 
     if features.name then
@@ -289,11 +275,11 @@ function Box:SetTransparency(t)
     self._outerStroke.Transparency  = t1
     self._borderStroke.Transparency = t1
     self._innerStroke.Transparency  = t1
+    if self._glow then
+        self._glow.ImageTransparency = t1
+    end
     if self._fill then
         self._fill.ImageTransparency = self._fillBaseAlpha + (1 - self._fillBaseAlpha) * t1
-    end
-    if self._glow then
-        self._glow.ImageTransparency = math.clamp(self._glowBaseAlpha + (1 - self._glowBaseAlpha) * t1, 0, 1)
     end
     if self._name then
         self._name.TextTransparency       = t1
@@ -346,15 +332,8 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     self._inner.Size      = UDim2.fromOffset(w - 2, h - 2)
     self._inner.Visible   = true
 
-    -- Glow: single 9-sliced image sized with a fixed pixel bleed on all sides.
-    -- The slice keeps the soft corner circles intact and stretches only the
-    -- flat edges — one draw call, no separate corner/edge objects.
     if self._glow then
-        local b = CFG.GlowBleed
-        self._glow.Position    = UDim2.fromOffset(x - b,      y - b)
-        self._glow.Size        = UDim2.fromOffset(w + b * 2,  h + b * 2)
-        self._glow.ImageColor3 = CFG.GlowColor
-        self._glow.Visible     = true
+        self._glow.Visible = true
     end
 
     if f.name and self._name then
@@ -481,12 +460,12 @@ function Box:Hide()
     self._outer.Visible  = false
     self._border.Visible = false
     self._inner.Visible  = false
+    if self._glow    then self._glow.Visible    = false end
     if self._name    then self._name.Visible    = false end
     if self._dist    then self._dist.Visible    = false end
     if self._hpBg    then self._hpBg.Visible    = false end
     if self._hpFill  then self._hpFill.Visible  = false end
     if self._hpText  then self._hpText.Visible  = false end
-    if self._glow    then self._glow.Visible    = false end
     if self._lines   then
         for _, line in ipairs(self._lines) do line.Visible = false end
     end
@@ -501,12 +480,12 @@ function Box:Destroy()
     self._outer:Destroy()
     self._border:Destroy()
     self._inner:Destroy()
+    if self._glow    then self._glow:Destroy()    end
     if self._name    then self._name:Destroy()    end
     if self._dist    then self._dist:Destroy()    end
     if self._hpBg    then self._hpBg:Destroy()    end
     if self._hpFill  then self._hpFill:Destroy()  end
     if self._hpText  then self._hpText:Destroy()  end
-    if self._glow    then self._glow:Destroy()    end
     if self._lines   then
         for _, line in ipairs(self._lines) do line:Destroy() end
         table.clear(self._lines)
@@ -599,8 +578,6 @@ function ESP.new(features)
     if features.ChamOccludedColor then CFG.ChamOccludedColor = features.ChamOccludedColor end
     if features.ChamTransparency  then CFG.ChamTransparency  = features.ChamTransparency  end
     if features.GlowColor         then CFG.GlowColor         = features.GlowColor         end
-    if features.GlowTransparency  then CFG.GlowTransparency  = features.GlowTransparency  end
-    if features.GlowBleed         then CFG.GlowBleed         = features.GlowBleed         end
 
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
