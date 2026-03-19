@@ -29,7 +29,7 @@ local CFG = {
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
     -- How far the glow extends INSIDE the box edges (positive = inward, negative = outward)
-    GlowInset          = 6,
+    GlowInset          = 4,
 }
 
 local gui
