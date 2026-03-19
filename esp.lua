@@ -153,10 +153,10 @@ function Box.new(features)
     if features.glow then
         local glow                  = Instance.new("ImageLabel")
         glow.Name                   = "glow"
-        glow.Size                   = UDim2.new(1.6, 0, 1.6, 0)
-        glow.Position               = UDim2.new(-0.3, 0, -0.3, 0)
+        glow.Size                   = UDim2.new(1.35, 0, 1.35, 0)
+        glow.Position               = UDim2.new(-0.175, 0, -0.175, 0)
         glow.BackgroundTransparency = 1
-        glow.Image                  = "rbxassetid://94493285753759"
+        glow.Image                  = "rbxassetid://126327713982623"
         glow.ImageColor3            = CFG.GlowColor
         glow.ImageTransparency      = CFG.GlowBrightness
         glow.ZIndex                 = self._border.ZIndex - 1
