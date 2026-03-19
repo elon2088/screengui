@@ -28,8 +28,7 @@ local CFG = {
     ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
-    -- How far the glow extends INSIDE the box edges (positive = inward, negative = outward)
-    GlowInset          = 4,
+    GlowPadScale       = 0.10, -- pad = h * this, consistent regardless of box width
 }
 
 local gui
@@ -333,13 +332,13 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     self._inner.Size      = UDim2.fromOffset(w - 2, h - 2)
     self._inner.Visible   = true
 
-    -- Glow sits inside the box edges by GlowInset pixels on each side.
-    -- Positive inset = glow is inward from the border (like image 1).
-    -- Set GlowInset to a negative number to push it outside instead.
+    -- Glow: pad is based on h only so it stays consistent when the box is narrow (side angle).
+    -- The glow image asset has ~8% internal padding baked in, so we compensate with a small inset.
     if self._glow then
-        local i             = CFG.GlowInset
-        self._glow.Position = UDim2.fromOffset(x + i, y + i)
-        self._glow.Size     = UDim2.fromOffset(w - i * 2, h - i * 2)
+        local pad    = math.max(4, h * CFG.GlowPadScale)
+        local inset  = pad * 0.18  -- compensates for the texture's built-in transparent border
+        self._glow.Position = UDim2.fromOffset(x - pad + inset, y - pad + inset)
+        self._glow.Size     = UDim2.fromOffset(w + (pad - inset) * 2, h + (pad - inset) * 2)
         self._glow.Visible  = true
     end
 
@@ -585,7 +584,7 @@ function ESP.new(features)
     if features.ChamOccludedColor then CFG.ChamOccludedColor = features.ChamOccludedColor end
     if features.ChamTransparency  then CFG.ChamTransparency  = features.ChamTransparency  end
     if features.GlowColor         then CFG.GlowColor         = features.GlowColor         end
-    if features.GlowInset         then CFG.GlowInset         = features.GlowInset         end
+    if features.GlowPadScale      then CFG.GlowPadScale      = features.GlowPadScale      end
 
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
