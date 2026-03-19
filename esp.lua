@@ -179,13 +179,13 @@ function Box.new(features)
         glow.Name                   = "Glow"
         glow.BackgroundTransparency = 1
         glow.BorderSizePixel        = 0
-        glow.Image                  = "rbxassetid://93208570840427"
+        glow.Image                  = "rbxassetid://126327713982623"
         glow.ImageColor3            = CFG.GlowColor
         glow.ImageTransparency      = CFG.GlowTransparency
         glow.ScaleType              = Enum.ScaleType.Slice
         -- Tell Roblox where the 9-slice cuts are.
         -- The image is a soft circle so slice at its centre on all sides.
-        glow.SliceCenter            = Rect.new(256, 256, 256, 256)
+        glow.SliceCenter            = Rect.new(256, 256, 256, 256)  -- assumes 512x512 image; adjust if your image is a different size
         glow.ZIndex                 = self._border.ZIndex - 2
         glow.Visible                = false
         glow.Parent                 = gui
