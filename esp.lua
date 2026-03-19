@@ -28,7 +28,7 @@ local CFG = {
     ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
-    GlowPadScale       = 0.10, -- pad = h * this, consistent regardless of box width
+    GlowPadScale       = 0.8, -- pad = h * this, consistent regardless of box width
 }
 
 local gui
