@@ -28,6 +28,7 @@ local CFG = {
     ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
+    GlowPad            = 18,
 }
 
 local gui
@@ -149,17 +150,17 @@ function Box.new(features)
     self._borderStroke = self._border:FindFirstChildOfClass("UIStroke")
     self._innerStroke  = self._inner:FindFirstChildOfClass("UIStroke")
 
+    -- Glow parented to gui so it renders outside the box, sized via pixels in Update()
     if features.glow then
         local glow                  = Instance.new("ImageLabel")
         glow.Name                   = "glow"
-        glow.Size                   = UDim2.new(1.2, 0, 1.2, 0)
-        glow.Position               = UDim2.new(-0.056, 0, -0.057, 0)
         glow.BackgroundTransparency = 1
         glow.Image                  = "rbxassetid://94493285753759"
         glow.ImageColor3            = CFG.GlowColor
         glow.ImageTransparency      = 0
         glow.ZIndex                 = self._border.ZIndex - 1
-        glow.Parent                 = self._border
+        glow.Visible                = false
+        glow.Parent                 = gui
         self._glow                  = glow
     end
 
@@ -332,8 +333,12 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     self._inner.Size      = UDim2.fromOffset(w - 2, h - 2)
     self._inner.Visible   = true
 
+    -- Glow: pixel-based, sits outside the box by GlowPad pixels on each side
     if self._glow then
-        self._glow.Visible = true
+        local pad           = CFG.GlowPad
+        self._glow.Position = UDim2.fromOffset(x - pad, y - pad)
+        self._glow.Size     = UDim2.fromOffset(w + pad * 2, h + pad * 2)
+        self._glow.Visible  = true
     end
 
     if f.name and self._name then
@@ -578,6 +583,7 @@ function ESP.new(features)
     if features.ChamOccludedColor then CFG.ChamOccludedColor = features.ChamOccludedColor end
     if features.ChamTransparency  then CFG.ChamTransparency  = features.ChamTransparency  end
     if features.GlowColor         then CFG.GlowColor         = features.GlowColor         end
+    if features.GlowPad           then CFG.GlowPad           = features.GlowPad           end
 
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
