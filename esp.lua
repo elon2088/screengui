@@ -28,7 +28,7 @@ local CFG = {
     ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
-    GlowPadScale       = 0.12, -- glow pad = this * min(boxW, boxH), keeps it proportional at all distances
+    GlowPadScale       = 0.12, -- pad = h * this, consistent regardless of box width
 }
 
 local gui
@@ -150,12 +150,11 @@ function Box.new(features)
     self._borderStroke = self._border:FindFirstChildOfClass("UIStroke")
     self._innerStroke  = self._inner:FindFirstChildOfClass("UIStroke")
 
-    -- Glow parented to gui, positioned via pixels in Update() so it works at all distances
     if features.glow then
         local glow                  = Instance.new("ImageLabel")
         glow.Name                   = "glow"
         glow.BackgroundTransparency = 1
-        glow.Image                  = "rbxassetid://94493285753759"
+        glow.Image                  = "rbxassetid://126327713982623"
         glow.ImageColor3            = CFG.GlowColor
         glow.ImageTransparency      = 0
         glow.ZIndex                 = self._border.ZIndex - 1
@@ -333,11 +332,13 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     self._inner.Size      = UDim2.fromOffset(w - 2, h - 2)
     self._inner.Visible   = true
 
-    -- Glow pad scales with the box size so it looks consistent at all distances
+    -- Glow: pad is based on h only so it stays consistent when the box is narrow (side angle).
+    -- The glow image asset has ~8% internal padding baked in, so we compensate with a small inset.
     if self._glow then
-        local pad           = math.max(4, math.min(w, h) * CFG.GlowPadScale)
-        self._glow.Position = UDim2.fromOffset(x - pad, y - pad)
-        self._glow.Size     = UDim2.fromOffset(w + pad * 2, h + pad * 2)
+        local pad    = math.max(4, h * CFG.GlowPadScale)
+        local inset  = pad * 0.18  -- compensates for the texture's built-in transparent border
+        self._glow.Position = UDim2.fromOffset(x - pad + inset, y - pad + inset)
+        self._glow.Size     = UDim2.fromOffset(w + (pad - inset) * 2, h + (pad - inset) * 2)
         self._glow.Visible  = true
     end
 
