@@ -28,8 +28,8 @@ local CFG = {
     ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
-    GlowPadScale       = 0.90,   -- inner glow pad = h * this
-    GlowPadScale2      = 0.90,   -- outer glow pad = h * this (larger = further out)
+    GlowPadScale       = 0.9,   -- inner glow pad = h * this
+    GlowPadScale2      = 0.9,   -- outer glow pad = h * this (larger = further out)
     GlowAlpha2         = 0,   -- outer glow is slightly more transparent
 }
 
