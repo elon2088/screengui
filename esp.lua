@@ -31,7 +31,7 @@ local CFG = {
     GlowPadScale       = 0.1,
     GlowPadScale2      = 0.1,
     GlowAlpha2         = 0,
-    RainbowSpeed       = 0.5, -- full hue cycle per second (lower = slower)
+    RainbowSpeed       = 0.5,
 }
 
 -- Rainbow state
@@ -39,9 +39,14 @@ local _rainbowEnabled = false
 local _rainbowHue     = 0
 local _rainbowConn    = nil
 
--- Keys that get recolored in rainbow mode (OutlineColor intentionally excluded)
+-- CFG keys that cycle with rainbow.
+-- Excluded: BorderColor, OutlineColor (box strokes stay fixed).
+-- Excluded: health bg (stays black), health bar outline.
+-- Included: FillColor, NameColor, DistColor, SkeletonColor,
+--           ChamVisibleColor, ChamOccludedColor, GlowColor.
+-- Health bar fill and health text are driven directly in Box:Update() from the live hue.
 local RAINBOW_KEYS = {
-    "BorderColor", "FillColor", "NameColor", "DistColor",
+    "FillColor", "NameColor", "DistColor",
     "SkeletonColor", "ChamVisibleColor", "ChamOccludedColor", "GlowColor",
 }
 
@@ -362,25 +367,27 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     local x, y, w, h = pos.X, pos.Y, size.X, size.Y
     local f          = self._features
 
-    -- In rainbow mode, sync rendered colors from CFG each frame
+    -- Rainbow: sync live CFG color to all included elements each frame.
+    -- Box border/outline strokes are intentionally excluded (stay fixed).
+    -- Health bg stays black, health bar outline stays default.
     if _rainbowEnabled then
-        local c = CFG.BorderColor -- all RAINBOW_KEYS share the same color
-        self._borderStroke.Color = c
-        self._outerStroke.Color  = c
-        self._innerStroke.Color  = c
-        if self._fill  then self._fill.ImageColor3  = CFG.FillColor  end
-        if self._glow  then self._glow.ImageColor3  = CFG.GlowColor  end
-        if self._glow2 then self._glow2.ImageColor3 = CFG.GlowColor  end
-        if self._name  then self._name.TextColor3   = CFG.NameColor  end
-        if self._dist  then self._dist.TextColor3   = CFG.DistColor  end
+        local c = CFG.FillColor -- all RAINBOW_KEYS share the same hue color
+        if self._fill  then self._fill.ImageColor3  = c end
+        if self._glow  then self._glow.ImageColor3  = c end
+        if self._glow2 then self._glow2.ImageColor3 = c end
+        if self._name  then self._name.TextColor3   = c end
+        if self._dist  then self._dist.TextColor3   = c end
+        -- Health bar fill and health text cycle with rainbow
+        if self._hpFill then self._hpFill.BackgroundColor3 = c end
+        if self._hpText then self._hpText.TextColor3       = c end
         if self._lines then
             for _, line in ipairs(self._lines) do
-                line.BackgroundColor3 = CFG.SkeletonColor
+                line.BackgroundColor3 = c
             end
         end
         if self._chams then
             for _, adorn in pairs(self._chams) do
-                adorn.Color3 = CFG.ChamVisibleColor
+                adorn.Color3 = c
             end
         end
     end
@@ -425,20 +432,26 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
         local fillH = barH * self._smoothPct
         local fillY = barY + barH - fillH
 
-        self._hpBg.Position           = UDim2.fromOffset(barX - 1, barY - 1)
-        self._hpBg.Size               = UDim2.fromOffset(barW + 2,  barH + 2)
-        self._hpBg.Visible            = true
+        self._hpBg.Position = UDim2.fromOffset(barX - 1, barY - 1)
+        self._hpBg.Size     = UDim2.fromOffset(barW + 2,  barH + 2)
+        self._hpBg.Visible  = true
 
-        self._hpFill.Position         = UDim2.fromOffset(barX, fillY)
-        self._hpFill.Size             = UDim2.fromOffset(barW, fillH)
-        self._hpFill.BackgroundColor3 = healthColor(self._smoothPct)
-        self._hpFill.Visible          = fillH > 0
+        self._hpFill.Position = UDim2.fromOffset(barX, fillY)
+        self._hpFill.Size     = UDim2.fromOffset(barW, fillH)
+        self._hpFill.Visible  = fillH > 0
+
+        -- Only use healthColor gradient when NOT in rainbow mode
+        if not _rainbowEnabled then
+            self._hpFill.BackgroundColor3 = healthColor(self._smoothPct)
+        end
 
         if f.healthtext and self._hpText then
-            self._hpText.Position   = UDim2.fromOffset(barX - 2, fillY)
-            self._hpText.Text       = tostring(health and math.ceil(health) or 0)
-            self._hpText.TextColor3 = healthColor(self._smoothPct)
-            self._hpText.Visible    = fillH > 0
+            self._hpText.Position = UDim2.fromOffset(barX - 2, fillY)
+            self._hpText.Text     = tostring(health and math.ceil(health) or 0)
+            self._hpText.Visible  = fillH > 0
+            if not _rainbowEnabled then
+                self._hpText.TextColor3 = healthColor(self._smoothPct)
+            end
         end
     end
 
@@ -458,7 +471,9 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
                 local s1, v1 = Camera:WorldToViewportPoint(p1Part.Position)
                 local s2, v2 = Camera:WorldToViewportPoint(p2Part.Position)
                 if v1 and v2 then
-                    line.BackgroundColor3       = CFG.SkeletonColor
+                    if not _rainbowEnabled then
+                        line.BackgroundColor3 = CFG.SkeletonColor
+                    end
                     line.BackgroundTransparency = CFG.SkeletonAlpha
                     updateLine(line, Vector2.new(s1.X, s1.Y), Vector2.new(s2.X, s2.Y))
                 else
@@ -485,7 +500,6 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
             isVisible    = result == nil
         end
 
-        -- In rainbow mode both cham colors are the same cycling color
         local chamColor = _rainbowEnabled and CFG.ChamVisibleColor
             or (f.chamsVisibleCheck
                 and (isVisible and CFG.ChamVisibleColor or CFG.ChamOccludedColor)
@@ -645,13 +659,8 @@ function ESP.new(features)
     if features.GlowAlpha2        then CFG.GlowAlpha2        = features.GlowAlpha2        end
     if features.RainbowSpeed      then CFG.RainbowSpeed      = features.RainbowSpeed      end
 
-    -- Start or stop rainbow based on flag
     _rainbowEnabled = features.rainbow == true
-    if _rainbowEnabled then
-        startRainbow()
-    else
-        stopRainbow()
-    end
+    if _rainbowEnabled then startRainbow() else stopRainbow() end
 
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
@@ -693,7 +702,6 @@ function ESP:Toggle()
     if self._destroy then self:Disable() else self:Enable() end
 end
 
--- Toggle rainbow at runtime without recreating the ESP
 function ESP:SetRainbow(enabled)
     _rainbowEnabled = enabled
     if enabled then startRainbow() else stopRainbow() end
