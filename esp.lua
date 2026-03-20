@@ -34,19 +34,15 @@ local CFG = {
     RainbowSpeed       = 0.5,
 }
 
--- Rainbow state
 local _rainbowEnabled = false
 local _rainbowHue     = 0
 local _rainbowConn    = nil
 
--- CFG keys that cycle with rainbow.
--- Excluded: BorderColor, OutlineColor (box strokes stay fixed).
--- Excluded: health bg (stays black), health bar outline.
--- Included: FillColor, NameColor, DistColor, SkeletonColor,
---           ChamVisibleColor, ChamOccludedColor, GlowColor.
--- Health bar fill and health text are driven directly in Box:Update() from the live hue.
+-- CFG keys updated each heartbeat tick when rainbow is on.
+-- Box border strokes are synced directly in Box:Update() each frame.
+-- Excluded: OutlineColor (stays black), health bg, health bar outline.
 local RAINBOW_KEYS = {
-    "FillColor", "NameColor", "DistColor",
+    "BorderColor", "FillColor", "NameColor", "DistColor",
     "SkeletonColor", "ChamVisibleColor", "ChamOccludedColor", "GlowColor",
 }
 
@@ -161,11 +157,11 @@ local function makeLine()
     f.Visible                = false
     f.ZIndex                 = 2
 
-    local outline            = Instance.new("UIStroke")
-    outline.Color            = CFG.OutlineColor
-    outline.Thickness        = 0.8
-    outline.LineJoinMode     = Enum.LineJoinMode.Round
-    outline.Parent           = f
+    local outline        = Instance.new("UIStroke")
+    outline.Color        = CFG.OutlineColor
+    outline.Thickness    = 0.8
+    outline.LineJoinMode = Enum.LineJoinMode.Round
+    outline.Parent       = f
 
     f.Parent = gui
     return f
@@ -260,22 +256,22 @@ function Box.new(features)
     end
 
     if features.healthbar then
-        local hpBg              = Instance.new("Frame")
-        hpBg.BackgroundColor3   = Color3.fromRGB(0, 0, 0)
-        hpBg.BorderSizePixel    = 0
-        hpBg.Visible            = false
-        hpBg.ZIndex             = self._border.ZIndex + 1
-        hpBg.Parent             = gui
-        self._hpBg              = hpBg
+        local hpBg            = Instance.new("Frame")
+        hpBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        hpBg.BorderSizePixel  = 0
+        hpBg.Visible          = false
+        hpBg.ZIndex           = self._border.ZIndex + 1
+        hpBg.Parent           = gui
+        self._hpBg            = hpBg
 
-        local hpFill              = Instance.new("Frame")
-        hpFill.BackgroundColor3   = Color3.fromRGB(0, 180, 0)
-        hpFill.BorderSizePixel    = 0
-        hpFill.AnchorPoint        = Vector2.new(0, 0)
-        hpFill.Visible            = false
-        hpFill.ZIndex             = self._border.ZIndex + 2
-        hpFill.Parent             = gui
-        self._hpFill              = hpFill
+        local hpFill            = Instance.new("Frame")
+        hpFill.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        hpFill.BorderSizePixel  = 0
+        hpFill.AnchorPoint      = Vector2.new(0, 0)
+        hpFill.Visible          = false
+        hpFill.ZIndex           = self._border.ZIndex + 2
+        hpFill.Parent           = gui
+        self._hpFill            = hpFill
 
         if features.healthtext then
             local hpText                  = Instance.new("TextLabel")
@@ -297,13 +293,8 @@ function Box.new(features)
         end
     end
 
-    if features.skeleton then
-        self._lines = {}
-    end
-
-    if features.chams then
-        self._chams = {}
-    end
+    if features.skeleton then self._lines = {} end
+    if features.chams    then self._chams = {} end
 
     self._outer.Visible  = false
     self._border.Visible = false
@@ -312,11 +303,13 @@ function Box.new(features)
     return self
 end
 
+-- Glow uses independent X/Y pads derived from w and h respectively,
+-- so the glow stays proportional even when the box is narrow (side-angle).
 local function applyGlowPos(glow, x, y, w, h, padScale)
-    local pad   = math.max(4, h * padScale)
-    local inset = pad * 0.18
-    glow.Position = UDim2.fromOffset(x - pad + inset, y - pad + inset)
-    glow.Size     = UDim2.fromOffset(w + (pad - inset) * 2, h + (pad - inset) * 2)
+    local padX = math.max(4, w * padScale)
+    local padY = math.max(4, h * padScale)
+    glow.Position = UDim2.fromOffset(x - padX, y - padY)
+    glow.Size     = UDim2.fromOffset(w + padX * 2, h + padY * 2)
     glow.Visible  = true
 end
 
@@ -367,17 +360,19 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     local x, y, w, h = pos.X, pos.Y, size.X, size.Y
     local f          = self._features
 
-    -- Rainbow: sync live CFG color to all included elements each frame.
-    -- Box border/outline strokes are intentionally excluded (stay fixed).
-    -- Health bg stays black, health bar outline stays default.
     if _rainbowEnabled then
-        local c = CFG.FillColor -- all RAINBOW_KEYS share the same hue color
+        local c = CFG.BorderColor
+        -- Box border strokes cycle with rainbow
+        self._borderStroke.Color = c
+        self._outerStroke.Color  = c
+        self._innerStroke.Color  = c
+        -- All other included elements
         if self._fill  then self._fill.ImageColor3  = c end
         if self._glow  then self._glow.ImageColor3  = c end
         if self._glow2 then self._glow2.ImageColor3 = c end
         if self._name  then self._name.TextColor3   = c end
         if self._dist  then self._dist.TextColor3   = c end
-        -- Health bar fill and health text cycle with rainbow
+        -- Health bar fill and text cycle; bg stays black
         if self._hpFill then self._hpFill.BackgroundColor3 = c end
         if self._hpText then self._hpText.TextColor3       = c end
         if self._lines then
@@ -439,8 +434,6 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
         self._hpFill.Position = UDim2.fromOffset(barX, fillY)
         self._hpFill.Size     = UDim2.fromOffset(barW, fillH)
         self._hpFill.Visible  = fillH > 0
-
-        -- Only use healthColor gradient when NOT in rainbow mode
         if not _rainbowEnabled then
             self._hpFill.BackgroundColor3 = healthColor(self._smoothPct)
         end
