@@ -154,10 +154,8 @@ function Box.new(features)
     self._features  = features
     self._smoothPct = 1
 
-    -- ZIndex layout (ascending = renders on top):
-    -- glows (lowest) → glowMask → outer → border/fill → inner → labels
-    -- The glowMask is a fully opaque black frame that sits exactly over the
-    -- box interior, punching out the glow center so it only shows around edges.
+
+    
 
     self._outer  = makeFrame(gui, CFG.OutlineColor, CFG.OutlineThick)
     self._border = makeFrame(gui, CFG.BorderColor,  CFG.BorderThick)
@@ -177,15 +175,15 @@ function Box.new(features)
             glow.Image                = "rbxassetid://126327713982623"
             glow.ImageColor3          = CFG.GlowColor
             glow.ImageTransparency    = alpha
-            -- All glow layers sit below the mask, which sits below the box frames
+
+            
             glow.ZIndex               = self._outer.ZIndex - 2 - (n - i)
             glow.Visible              = false
             glow.Parent               = gui
             self._glows[i] = { img = glow, baseAlpha = alpha }
         end
 
-        -- Opaque mask frame: same ZIndex as outer - 1 (above all glows, below box)
-        -- Blocks the glow from showing through the box interior
+
         local mask                    = Instance.new("Frame")
         mask.BackgroundColor3         = Color3.fromRGB(0, 0, 0)
         mask.BackgroundTransparency   = 0
@@ -198,7 +196,7 @@ function Box.new(features)
 
     if features.fill then
         local fill                  = Instance.new("ImageLabel")
-        fill.BackgroundTransparency = 1
+        fill.BackgroundTransparency = 111
         fill.BorderSizePixel        = 0
         fill.Size                   = UDim2.fromScale(1, 1)
         fill.Position               = UDim2.fromScale(0, 0)
@@ -307,7 +305,7 @@ local function applyGlowLayers(glows, mask, x, y, w, h)
         entry.img.Size     = UDim2.fromOffset(w + pad * 2, h + pad * 2)
         entry.img.Visible  = true
     end
-    -- Mask covers the exact box interior, blocking glow bleed-through
+
     if mask then
         mask.Position = UDim2.fromOffset(x, y)
         mask.Size     = UDim2.fromOffset(w, h)
@@ -325,7 +323,7 @@ function Box:SetTransparency(t)
             entry.img.ImageTransparency = entry.baseAlpha + (1 - entry.baseAlpha) * t1
         end
     end
-    -- Fade mask alongside the box so it disappears on death fade
+
     if self._glowMask then
         self._glowMask.BackgroundTransparency = t1
     end
