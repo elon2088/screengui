@@ -28,10 +28,40 @@ local CFG = {
     ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
-    GlowPadScale       = 0.1,   -- inner glow pad = h * this
-    GlowPadScale2      = 0.1,   -- outer glow pad = h * this (larger = further out)
-    GlowAlpha2         = 0,   -- outer glow is slightly more transparent
+    GlowPadScale       = 0.1,
+    GlowPadScale2      = 0.1,
+    GlowAlpha2         = 0,
+    RainbowSpeed       = 0.5, -- full hue cycle per second (lower = slower)
 }
+
+-- Rainbow state
+local _rainbowEnabled = false
+local _rainbowHue     = 0
+local _rainbowConn    = nil
+
+-- Keys that get recolored in rainbow mode (OutlineColor intentionally excluded)
+local RAINBOW_KEYS = {
+    "BorderColor", "FillColor", "NameColor", "DistColor",
+    "SkeletonColor", "ChamVisibleColor", "ChamOccludedColor", "GlowColor",
+}
+
+local function startRainbow()
+    if _rainbowConn then return end
+    _rainbowConn = RunService.Heartbeat:Connect(function(dt)
+        _rainbowHue = (_rainbowHue + dt * CFG.RainbowSpeed) % 1
+        local color = Color3.fromHSV(_rainbowHue, 1, 1)
+        for _, key in ipairs(RAINBOW_KEYS) do
+            CFG[key] = color
+        end
+    end)
+end
+
+local function stopRainbow()
+    if _rainbowConn then
+        _rainbowConn:Disconnect()
+        _rainbowConn = nil
+    end
+end
 
 local gui
 do
@@ -166,9 +196,7 @@ function Box.new(features)
     self._innerStroke  = self._inner:FindFirstChildOfClass("UIStroke")
 
     if features.glow then
-        -- Inner glow (closer to the box, fully opaque)
         self._glow  = makeGlow(self._border.ZIndex - 1, 0)
-        -- Outer glow (further out, slightly transparent for a soft falloff)
         self._glow2 = makeGlow(self._border.ZIndex - 2, CFG.GlowAlpha2)
     end
 
@@ -292,17 +320,10 @@ function Box:SetTransparency(t)
     self._outerStroke.Transparency  = t1
     self._borderStroke.Transparency = t1
     self._innerStroke.Transparency  = t1
-    if self._glow then
-        self._glow.ImageTransparency  = t1
-    end
-    if self._glow2 then
-        -- outer glow fades from its base alpha, not from 0
-        self._glow2.ImageTransparency = CFG.GlowAlpha2 + (1 - CFG.GlowAlpha2) * t1
-    end
-    if self._fill then
-        self._fill.ImageTransparency = self._fillBaseAlpha + (1 - self._fillBaseAlpha) * t1
-    end
-    if self._name then
+    if self._glow  then self._glow.ImageTransparency  = t1 end
+    if self._glow2 then self._glow2.ImageTransparency = CFG.GlowAlpha2 + (1 - CFG.GlowAlpha2) * t1 end
+    if self._fill  then self._fill.ImageTransparency  = self._fillBaseAlpha + (1 - self._fillBaseAlpha) * t1 end
+    if self._name  then
         self._name.TextTransparency       = t1
         self._name.TextStrokeTransparency = t1
     end
@@ -341,6 +362,29 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     local x, y, w, h = pos.X, pos.Y, size.X, size.Y
     local f          = self._features
 
+    -- In rainbow mode, sync rendered colors from CFG each frame
+    if _rainbowEnabled then
+        local c = CFG.BorderColor -- all RAINBOW_KEYS share the same color
+        self._borderStroke.Color = c
+        self._outerStroke.Color  = c
+        self._innerStroke.Color  = c
+        if self._fill  then self._fill.ImageColor3  = CFG.FillColor  end
+        if self._glow  then self._glow.ImageColor3  = CFG.GlowColor  end
+        if self._glow2 then self._glow2.ImageColor3 = CFG.GlowColor  end
+        if self._name  then self._name.TextColor3   = CFG.NameColor  end
+        if self._dist  then self._dist.TextColor3   = CFG.DistColor  end
+        if self._lines then
+            for _, line in ipairs(self._lines) do
+                line.BackgroundColor3 = CFG.SkeletonColor
+            end
+        end
+        if self._chams then
+            for _, adorn in pairs(self._chams) do
+                adorn.Color3 = CFG.ChamVisibleColor
+            end
+        end
+    end
+
     self._outer.Position  = UDim2.fromOffset(x - 1, y - 1)
     self._outer.Size      = UDim2.fromOffset(w + 2,  h + 2)
     self._outer.Visible   = true
@@ -369,9 +413,8 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     end
 
     if f.healthbar and self._hpBg and self._hpFill then
-        local pct  = (health and maxHealth and maxHealth > 0)
-                      and math.clamp(health / maxHealth, 0, 1)
-                      or 1
+        local pct = (health and maxHealth and maxHealth > 0)
+            and math.clamp(health / maxHealth, 0, 1) or 1
 
         self._smoothPct = self._smoothPct + (pct - self._smoothPct) * CFG.HealthLerp
 
@@ -386,8 +429,8 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
         self._hpBg.Size               = UDim2.fromOffset(barW + 2,  barH + 2)
         self._hpBg.Visible            = true
 
-        self._hpFill.Position         = UDim2.fromOffset(barX,      fillY)
-        self._hpFill.Size             = UDim2.fromOffset(barW,      fillH)
+        self._hpFill.Position         = UDim2.fromOffset(barX, fillY)
+        self._hpFill.Size             = UDim2.fromOffset(barW, fillH)
         self._hpFill.BackgroundColor3 = healthColor(self._smoothPct)
         self._hpFill.Visible          = fillH > 0
 
@@ -414,7 +457,6 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
             if p1Part and p2Part then
                 local s1, v1 = Camera:WorldToViewportPoint(p1Part.Position)
                 local s2, v2 = Camera:WorldToViewportPoint(p2Part.Position)
-
                 if v1 and v2 then
                     line.BackgroundColor3       = CFG.SkeletonColor
                     line.BackgroundTransparency = CFG.SkeletonAlpha
@@ -434,7 +476,6 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
 
     if f.chams and self._chams and character then
         local isVisible = false
-
         local root = character:FindFirstChild("HumanoidRootPart")
         if root then
             local origin = Camera.CFrame.Position
@@ -444,9 +485,11 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
             isVisible    = result == nil
         end
 
-        local chamColor = f.chamsVisibleCheck
-            and (isVisible and CFG.ChamVisibleColor or CFG.ChamOccludedColor)
-            or CFG.ChamVisibleColor
+        -- In rainbow mode both cham colors are the same cycling color
+        local chamColor = _rainbowEnabled and CFG.ChamVisibleColor
+            or (f.chamsVisibleCheck
+                and (isVisible and CFG.ChamVisibleColor or CFG.ChamOccludedColor)
+                or CFG.ChamVisibleColor)
 
         local activeParts = {}
         for _, part in ipairs(character:GetChildren()) do
@@ -454,12 +497,12 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
                 activeParts[part] = true
                 local adorn = self._chams[part]
                 if not adorn then
-                    adorn              = Instance.new("BoxHandleAdornment")
-                    adorn.AlwaysOnTop  = true
-                    adorn.ZIndex       = 5
-                    adorn.Adornee      = part
-                    adorn.Parent       = part
-                    self._chams[part]  = adorn
+                    adorn             = Instance.new("BoxHandleAdornment")
+                    adorn.AlwaysOnTop = true
+                    adorn.ZIndex      = 5
+                    adorn.Adornee     = part
+                    adorn.Parent      = part
+                    self._chams[part] = adorn
                 end
                 adorn.Size         = part.Size + Vector3.new(0.02, 0.02, 0.02)
                 adorn.Color3       = chamColor
@@ -480,17 +523,15 @@ function Box:Hide()
     self._outer.Visible  = false
     self._border.Visible = false
     self._inner.Visible  = false
-    if self._glow    then self._glow.Visible    = false end
-    if self._glow2   then self._glow2.Visible   = false end
-    if self._name    then self._name.Visible    = false end
-    if self._dist    then self._dist.Visible    = false end
-    if self._hpBg    then self._hpBg.Visible    = false end
-    if self._hpFill  then self._hpFill.Visible  = false end
-    if self._hpText  then self._hpText.Visible  = false end
-    if self._lines   then
-        for _, line in ipairs(self._lines) do line.Visible = false end
-    end
-    if self._chams then
+    if self._glow   then self._glow.Visible   = false end
+    if self._glow2  then self._glow2.Visible  = false end
+    if self._name   then self._name.Visible   = false end
+    if self._dist   then self._dist.Visible   = false end
+    if self._hpBg   then self._hpBg.Visible   = false end
+    if self._hpFill then self._hpFill.Visible = false end
+    if self._hpText then self._hpText.Visible = false end
+    if self._lines  then for _, l in ipairs(self._lines) do l.Visible = false end end
+    if self._chams  then
         for _, adorn in pairs(self._chams) do
             pcall(function() adorn.Transparency = 1 end)
         end
@@ -501,15 +542,15 @@ function Box:Destroy()
     self._outer:Destroy()
     self._border:Destroy()
     self._inner:Destroy()
-    if self._glow    then self._glow:Destroy()    end
-    if self._glow2   then self._glow2:Destroy()   end
-    if self._name    then self._name:Destroy()    end
-    if self._dist    then self._dist:Destroy()    end
-    if self._hpBg    then self._hpBg:Destroy()    end
-    if self._hpFill  then self._hpFill:Destroy()  end
-    if self._hpText  then self._hpText:Destroy()  end
-    if self._lines   then
-        for _, line in ipairs(self._lines) do line:Destroy() end
+    if self._glow   then self._glow:Destroy()   end
+    if self._glow2  then self._glow2:Destroy()  end
+    if self._name   then self._name:Destroy()   end
+    if self._dist   then self._dist:Destroy()   end
+    if self._hpBg   then self._hpBg:Destroy()   end
+    if self._hpFill then self._hpFill:Destroy() end
+    if self._hpText then self._hpText:Destroy() end
+    if self._lines  then
+        for _, l in ipairs(self._lines) do l:Destroy() end
         table.clear(self._lines)
     end
     if self._chams then
@@ -538,7 +579,6 @@ local function GetBoundingBox(character)
             local hX = part.Size.X * 0.5
             local hY = part.Size.Y * 0.5
             local hZ = part.Size.Z * 0.5
-
             for _, o in ipairs(OFFSETS) do
                 local screen, vis = Camera:WorldToViewportPoint(
                     cf * Vector3.new(o.X * hX, o.Y * hY, o.Z * hZ)
@@ -566,15 +606,15 @@ function ESP.new(features)
     local self = setmetatable({}, ESP)
 
     self._features = {
-        fill               = features.fill               ~= false,
-        name               = features.name               ~= false,
-        distance           = features.distance           ~= false,
-        healthbar          = features.healthbar          ~= false,
-        healthtext         = features.healthtext         ~= false,
-        skeleton           = features.skeleton           == true,
-        chams              = features.chams              == true,
-        chamsVisibleCheck  = features.chamsVisibleCheck  ~= false,
-        glow               = features.glow               == true,
+        fill              = features.fill              ~= false,
+        name              = features.name              ~= false,
+        distance          = features.distance          ~= false,
+        healthbar         = features.healthbar         ~= false,
+        healthtext        = features.healthtext        ~= false,
+        skeleton          = features.skeleton          == true,
+        chams             = features.chams             == true,
+        chamsVisibleCheck = features.chamsVisibleCheck ~= false,
+        glow              = features.glow              == true,
     }
 
     self._fadeDuration = features.FadeDuration or 2.5
@@ -603,6 +643,15 @@ function ESP.new(features)
     if features.GlowPadScale      then CFG.GlowPadScale      = features.GlowPadScale      end
     if features.GlowPadScale2     then CFG.GlowPadScale2     = features.GlowPadScale2     end
     if features.GlowAlpha2        then CFG.GlowAlpha2        = features.GlowAlpha2        end
+    if features.RainbowSpeed      then CFG.RainbowSpeed      = features.RainbowSpeed      end
+
+    -- Start or stop rainbow based on flag
+    _rainbowEnabled = features.rainbow == true
+    if _rainbowEnabled then
+        startRainbow()
+    else
+        stopRainbow()
+    end
 
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
@@ -636,11 +685,18 @@ function ESP:Disable()
         self._destroy()
         self._destroy = nil
     end
+    stopRainbow()
     gui.Enabled = false
 end
 
 function ESP:Toggle()
     if self._destroy then self:Disable() else self:Enable() end
+end
+
+-- Toggle rainbow at runtime without recreating the ESP
+function ESP:SetRainbow(enabled)
+    _rainbowEnabled = enabled
+    if enabled then startRainbow() else stopRainbow() end
 end
 
 function ESP:SetConfig(key, value)
