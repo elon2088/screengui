@@ -28,9 +28,10 @@ local CFG = {
     ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
-    GlowPadScale       = 0.1,
-    GlowPadScale2      = 0.1,
-    GlowAlpha2         = 0,
+    GlowPadScale       = 0.08,  -- each layer adds this * min(w,h) extra pad
+    GlowLayers         = 2,     -- how many glow images stacked (1-8 recommended)
+    GlowBaseAlpha      = 0.0,   -- innermost layer transparency
+    GlowFalloff        = 0.35,  -- added transparency per outer layer
     RainbowSpeed       = 0.5,
 }
 
@@ -38,9 +39,8 @@ local _rainbowEnabled = false
 local _rainbowHue     = 0
 local _rainbowConn    = nil
 
--- CFG keys updated each heartbeat tick when rainbow is on.
--- Box border strokes are synced directly in Box:Update() each frame.
--- Excluded: OutlineColor (stays black), health bg, health bar outline.
+-- Only BorderColor cycles; OutlineColor stays fixed so outer/inner strokes remain black.
+-- Health bg excluded (stays black). Health fill + text included.
 local RAINBOW_KEYS = {
     "BorderColor", "FillColor", "NameColor", "DistColor",
     "SkeletonColor", "ChamVisibleColor", "ChamOccludedColor", "GlowColor",
@@ -50,10 +50,8 @@ local function startRainbow()
     if _rainbowConn then return end
     _rainbowConn = RunService.Heartbeat:Connect(function(dt)
         _rainbowHue = (_rainbowHue + dt * CFG.RainbowSpeed) % 1
-        local color = Color3.fromHSV(_rainbowHue, 1, 1)
-        for _, key in ipairs(RAINBOW_KEYS) do
-            CFG[key] = color
-        end
+        local c = Color3.fromHSV(_rainbowHue, 1, 1)
+        for _, key in ipairs(RAINBOW_KEYS) do CFG[key] = c end
     end)
 end
 
@@ -110,42 +108,16 @@ local function makeFrame(parent, strokeColor, strokeThick)
     return f
 end
 
-local function makeGlow(zIndex, alpha)
-    local glow                  = Instance.new("ImageLabel")
-    glow.Name                   = "glow"
-    glow.BackgroundTransparency = 1
-    glow.Image                  = "rbxassetid://126327713982623"
-    glow.ImageColor3            = CFG.GlowColor
-    glow.ImageTransparency      = alpha or 0
-    glow.ZIndex                 = zIndex
-    glow.Visible                = false
-    glow.Parent                 = gui
-    return glow
-end
-
 local SKELETON_R15 = {
-    {"Head",          "UpperTorso"},
-    {"UpperTorso",    "LowerTorso"},
-    {"UpperTorso",    "LeftUpperArm"},
-    {"LeftUpperArm",  "LeftLowerArm"},
-    {"LeftLowerArm",  "LeftHand"},
-    {"UpperTorso",    "RightUpperArm"},
-    {"RightUpperArm", "RightLowerArm"},
-    {"RightLowerArm", "RightHand"},
-    {"LowerTorso",    "LeftUpperLeg"},
-    {"LeftUpperLeg",  "LeftLowerLeg"},
-    {"LeftLowerLeg",  "LeftFoot"},
-    {"LowerTorso",    "RightUpperLeg"},
-    {"RightUpperLeg", "RightLowerLeg"},
-    {"RightLowerLeg", "RightFoot"},
+    {"Head","UpperTorso"},{"UpperTorso","LowerTorso"},
+    {"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},
+    {"UpperTorso","RightUpperArm"},{"RightUpperArm","RightLowerArm"},{"RightLowerArm","RightHand"},
+    {"LowerTorso","LeftUpperLeg"},{"LeftUpperLeg","LeftLowerLeg"},{"LeftLowerLeg","LeftFoot"},
+    {"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"},{"RightLowerLeg","RightFoot"},
 }
-
 local SKELETON_R6 = {
-    {"Head",      "Torso"},
-    {"Torso",     "Left Arm"},
-    {"Torso",     "Right Arm"},
-    {"Torso",     "Left Leg"},
-    {"Torso",     "Right Leg"},
+    {"Head","Torso"},{"Torso","Left Arm"},{"Torso","Right Arm"},
+    {"Torso","Left Leg"},{"Torso","Right Leg"},
 }
 
 local function makeLine()
@@ -156,24 +128,21 @@ local function makeLine()
     f.AnchorPoint            = Vector2.new(0.5, 0.5)
     f.Visible                = false
     f.ZIndex                 = 2
-
-    local outline        = Instance.new("UIStroke")
-    outline.Color        = CFG.OutlineColor
-    outline.Thickness    = 0.8
-    outline.LineJoinMode = Enum.LineJoinMode.Round
-    outline.Parent       = f
-
-    f.Parent = gui
+    local outline            = Instance.new("UIStroke")
+    outline.Color            = CFG.OutlineColor
+    outline.Thickness        = 0.8
+    outline.LineJoinMode     = Enum.LineJoinMode.Round
+    outline.Parent           = f
+    f.Parent                 = gui
     return f
 end
 
 local function updateLine(line, p1, p2)
     local delta   = p2 - p1
     local dist    = delta.Magnitude
-    local angle   = math.deg(math.atan2(delta.Y, delta.X))
     line.Position = UDim2.fromOffset(p1.X + delta.X * 0.5, p1.Y + delta.Y * 0.5)
     line.Size     = UDim2.fromOffset(dist, CFG.SkeletonThick)
-    line.Rotation = angle
+    line.Rotation = math.deg(math.atan2(delta.Y, delta.X))
     line.Visible  = true
 end
 
@@ -188,6 +157,8 @@ function Box.new(features)
     self._features  = features
     self._smoothPct = 1
 
+    -- Outer/inner use OutlineColor (stays black always).
+    -- Border uses BorderColor (cycles in rainbow).
     self._outer  = makeFrame(gui, CFG.OutlineColor, CFG.OutlineThick)
     self._border = makeFrame(gui, CFG.BorderColor,  CFG.BorderThick)
     self._inner  = makeFrame(gui, CFG.OutlineColor, CFG.OutlineThick)
@@ -196,9 +167,22 @@ function Box.new(features)
     self._borderStroke = self._border:FindFirstChildOfClass("UIStroke")
     self._innerStroke  = self._inner:FindFirstChildOfClass("UIStroke")
 
+    -- Build N glow layers; each outer layer is larger and more transparent.
     if features.glow then
-        self._glow  = makeGlow(self._border.ZIndex - 1, 0)
-        self._glow2 = makeGlow(self._border.ZIndex - 2, CFG.GlowAlpha2)
+        self._glows = {}
+        local n = math.max(1, math.floor(CFG.GlowLayers))
+        for i = 1, n do
+            local alpha        = math.clamp(CFG.GlowBaseAlpha + (i - 1) * CFG.GlowFalloff, 0, 1)
+            local glow                  = Instance.new("ImageLabel")
+            glow.BackgroundTransparency = 1
+            glow.Image                  = "rbxassetid://126327713982623"
+            glow.ImageColor3            = CFG.GlowColor
+            glow.ImageTransparency      = alpha
+            glow.ZIndex                 = self._border.ZIndex - i
+            glow.Visible                = false
+            glow.Parent                 = gui
+            self._glows[i] = { img = glow, baseAlpha = alpha }
+        end
     end
 
     if features.fill then
@@ -303,14 +287,19 @@ function Box.new(features)
     return self
 end
 
--- Glow uses independent X/Y pads derived from w and h respectively,
--- so the glow stays proportional even when the box is narrow (side-angle).
-local function applyGlowPos(glow, x, y, w, h, padScale)
-    local padX = math.max(4, w * padScale)
-    local padY = math.max(4, h * padScale)
-    glow.Position = UDim2.fromOffset(x - padX, y - padY)
-    glow.Size     = UDim2.fromOffset(w + padX * 2, h + padY * 2)
-    glow.Visible  = true
+-- Glow pad is capped at a fixed max pixel size to prevent overflow on tall boxes.
+-- Each layer multiplies the pad by its index so they spread evenly outward.
+local GLOW_PAD_MAX = 20 -- max pixels per layer regardless of box size
+
+local function applyGlowLayers(glows, x, y, w, h)
+    if not glows then return end
+    local base = math.min(math.min(w, h) * CFG.GlowPadScale, GLOW_PAD_MAX)
+    for i, entry in ipairs(glows) do
+        local pad = base * i
+        entry.img.Position = UDim2.fromOffset(x - pad, y - pad)
+        entry.img.Size     = UDim2.fromOffset(w + pad * 2, h + pad * 2)
+        entry.img.Visible  = true
+    end
 end
 
 function Box:SetTransparency(t)
@@ -318,8 +307,11 @@ function Box:SetTransparency(t)
     self._outerStroke.Transparency  = t1
     self._borderStroke.Transparency = t1
     self._innerStroke.Transparency  = t1
-    if self._glow  then self._glow.ImageTransparency  = t1 end
-    if self._glow2 then self._glow2.ImageTransparency = CFG.GlowAlpha2 + (1 - CFG.GlowAlpha2) * t1 end
+    if self._glows then
+        for _, entry in ipairs(self._glows) do
+            entry.img.ImageTransparency = entry.baseAlpha + (1 - entry.baseAlpha) * t1
+        end
+    end
     if self._fill  then self._fill.ImageTransparency  = self._fillBaseAlpha + (1 - self._fillBaseAlpha) * t1 end
     if self._name  then
         self._name.TextTransparency       = t1
@@ -362,28 +354,21 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
 
     if _rainbowEnabled then
         local c = CFG.BorderColor
-        -- Box border strokes cycle with rainbow
+        -- Only the border stroke cycles; outer/inner strokes stay OutlineColor (black)
         self._borderStroke.Color = c
-        self._outerStroke.Color  = c
-        self._innerStroke.Color  = c
-        -- All other included elements
         if self._fill  then self._fill.ImageColor3  = c end
-        if self._glow  then self._glow.ImageColor3  = c end
-        if self._glow2 then self._glow2.ImageColor3 = c end
+        if self._glows then
+            for _, entry in ipairs(self._glows) do entry.img.ImageColor3 = c end
+        end
         if self._name  then self._name.TextColor3   = c end
         if self._dist  then self._dist.TextColor3   = c end
-        -- Health bar fill and text cycle; bg stays black
         if self._hpFill then self._hpFill.BackgroundColor3 = c end
         if self._hpText then self._hpText.TextColor3       = c end
         if self._lines then
-            for _, line in ipairs(self._lines) do
-                line.BackgroundColor3 = c
-            end
+            for _, line in ipairs(self._lines) do line.BackgroundColor3 = c end
         end
         if self._chams then
-            for _, adorn in pairs(self._chams) do
-                adorn.Color3 = c
-            end
+            for _, adorn in pairs(self._chams) do adorn.Color3 = c end
         end
     end
 
@@ -399,8 +384,7 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     self._inner.Size      = UDim2.fromOffset(w - 2, h - 2)
     self._inner.Visible   = true
 
-    if self._glow  then applyGlowPos(self._glow,  x, y, w, h, CFG.GlowPadScale)  end
-    if self._glow2 then applyGlowPos(self._glow2, x, y, w, h, CFG.GlowPadScale2) end
+    applyGlowLayers(self._glows, x, y, w, h)
 
     if f.name and self._name then
         self._name.Position = UDim2.fromOffset(x + w * 0.5, y - 2)
@@ -450,23 +434,18 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
 
     if f.skeleton and self._lines and character then
         local conns = character:FindFirstChild("UpperTorso") and SKELETON_R15 or SKELETON_R6
-
         while #self._lines < #conns do
             self._lines[#self._lines + 1] = makeLine()
         end
-
         for i, conn in ipairs(conns) do
             local p1Part = character:FindFirstChild(conn[1])
             local p2Part = character:FindFirstChild(conn[2])
             local line   = self._lines[i]
-
             if p1Part and p2Part then
                 local s1, v1 = Camera:WorldToViewportPoint(p1Part.Position)
                 local s2, v2 = Camera:WorldToViewportPoint(p2Part.Position)
                 if v1 and v2 then
-                    if not _rainbowEnabled then
-                        line.BackgroundColor3 = CFG.SkeletonColor
-                    end
+                    if not _rainbowEnabled then line.BackgroundColor3 = CFG.SkeletonColor end
                     line.BackgroundTransparency = CFG.SkeletonAlpha
                     updateLine(line, Vector2.new(s1.X, s1.Y), Vector2.new(s2.X, s2.Y))
                 else
@@ -476,10 +455,7 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
                 line.Visible = false
             end
         end
-
-        for i = #conns + 1, #self._lines do
-            self._lines[i].Visible = false
-        end
+        for i = #conns + 1, #self._lines do self._lines[i].Visible = false end
     end
 
     if f.chams and self._chams and character then
@@ -487,17 +463,13 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
         local root = character:FindFirstChild("HumanoidRootPart")
         if root then
             local origin = Camera.CFrame.Position
-            local dir    = root.Position - origin
             RAYCAST_PARAMS.FilterDescendantsInstances = {character}
-            local result = workspace:Raycast(origin, dir, RAYCAST_PARAMS)
+            local result = workspace:Raycast(origin, root.Position - origin, RAYCAST_PARAMS)
             isVisible    = result == nil
         end
-
         local chamColor = _rainbowEnabled and CFG.ChamVisibleColor
-            or (f.chamsVisibleCheck
-                and (isVisible and CFG.ChamVisibleColor or CFG.ChamOccludedColor)
-                or CFG.ChamVisibleColor)
-
+            or (f.chamsVisibleCheck and (isVisible and CFG.ChamVisibleColor or CFG.ChamOccludedColor)
+            or CFG.ChamVisibleColor)
         local activeParts = {}
         for _, part in ipairs(character:GetChildren()) do
             if part:IsA("BasePart") then
@@ -516,7 +488,6 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
                 adorn.Transparency = CFG.ChamTransparency
             end
         end
-
         for part, adorn in pairs(self._chams) do
             if not activeParts[part] then
                 pcall(function() adorn:Destroy() end)
@@ -530,8 +501,7 @@ function Box:Hide()
     self._outer.Visible  = false
     self._border.Visible = false
     self._inner.Visible  = false
-    if self._glow   then self._glow.Visible   = false end
-    if self._glow2  then self._glow2.Visible  = false end
+    if self._glows  then for _, e in ipairs(self._glows)  do e.img.Visible = false end end
     if self._name   then self._name.Visible   = false end
     if self._dist   then self._dist.Visible   = false end
     if self._hpBg   then self._hpBg.Visible   = false end
@@ -539,9 +509,7 @@ function Box:Hide()
     if self._hpText then self._hpText.Visible = false end
     if self._lines  then for _, l in ipairs(self._lines) do l.Visible = false end end
     if self._chams  then
-        for _, adorn in pairs(self._chams) do
-            pcall(function() adorn.Transparency = 1 end)
-        end
+        for _, adorn in pairs(self._chams) do pcall(function() adorn.Transparency = 1 end) end
     end
 end
 
@@ -549,8 +517,7 @@ function Box:Destroy()
     self._outer:Destroy()
     self._border:Destroy()
     self._inner:Destroy()
-    if self._glow   then self._glow:Destroy()   end
-    if self._glow2  then self._glow2:Destroy()  end
+    if self._glows  then for _, e in ipairs(self._glows)  do e.img:Destroy() end end
     if self._name   then self._name:Destroy()   end
     if self._dist   then self._dist:Destroy()   end
     if self._hpBg   then self._hpBg:Destroy()   end
@@ -579,7 +546,6 @@ local function GetBoundingBox(character)
     local minX, minY =  math.huge,  math.huge
     local maxX, maxY = -math.huge, -math.huge
     local valid      = false
-
     for _, part in ipairs(character:GetChildren()) do
         if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
             local cf = part.CFrame
@@ -600,7 +566,6 @@ local function GetBoundingBox(character)
             end
         end
     end
-
     if not valid then return nil end
     return Vector2.new(minX, minY), Vector2.new(maxX - minX, maxY - minY)
 end
@@ -648,8 +613,9 @@ function ESP.new(features)
     if features.ChamTransparency  then CFG.ChamTransparency  = features.ChamTransparency  end
     if features.GlowColor         then CFG.GlowColor         = features.GlowColor         end
     if features.GlowPadScale      then CFG.GlowPadScale      = features.GlowPadScale      end
-    if features.GlowPadScale2     then CFG.GlowPadScale2     = features.GlowPadScale2     end
-    if features.GlowAlpha2        then CFG.GlowAlpha2        = features.GlowAlpha2        end
+    if features.GlowLayers        then CFG.GlowLayers        = features.GlowLayers        end
+    if features.GlowBaseAlpha     then CFG.GlowBaseAlpha     = features.GlowBaseAlpha     end
+    if features.GlowFalloff       then CFG.GlowFalloff       = features.GlowFalloff       end
     if features.RainbowSpeed      then CFG.RainbowSpeed      = features.RainbowSpeed      end
 
     _rainbowEnabled = features.rainbow == true
@@ -665,11 +631,9 @@ end
 
 function ESP:Enable()
     if self._destroy then return end
-
     local PlayerHandler = loadstring(game:HttpGet(
         "https://raw.githubusercontent.com/elon2088/screengui/refs/heads/main/ph.lua"
     ))()
-
     self._destroy = PlayerHandler.init({
         LocalPlayer    = LocalPlayer,
         Players        = Players,
@@ -678,7 +642,6 @@ function ESP:Enable()
         GetBoundingBox = self._GetBoundingBox,
         FadeDuration   = self._fadeDuration,
     })
-
     gui.Enabled = true
 end
 
