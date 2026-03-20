@@ -28,12 +28,10 @@ local CFG = {
     ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
-    GlowPadScale       = 0.08,     -- pad per layer = min(w,h) * scale
-    GlowMinPad         = 6,        -- minimum pad in pixels (keeps glow visible at distance)
-    GlowMaxPadRatio    = 0.35,     -- pad clamped to this ratio of min(w,h) (prevents close bleed)
-    GlowLayers         = 2,        -- number of stacked glow images
-    GlowBaseAlpha      = 0.0,      -- innermost layer transparency
-    GlowFalloff        = 0.35,     -- transparency added per outer layer
+    GlowPadScale       = 0.08,
+    GlowLayers         = 2,
+    GlowBaseAlpha      = 0.0,
+    GlowFalloff        = 0.35,
     RainbowSpeed       = 0.5,
 }
 
@@ -79,13 +77,17 @@ end
 
 local function healthColor(pct)
     if pct > 0.75 then
-        return Color3.fromRGB(math.floor(180 * (1 - (pct - 0.75) / 0.25)), 180, 0)
+        local t = (pct - 0.75) / 0.25
+        return Color3.fromRGB(math.floor(180 * (1 - t)), 180, 0)
     elseif pct > 0.5 then
-        return Color3.fromRGB(200, math.floor(180 * ((pct - 0.5) / 0.25)), 0)
+        local t = (pct - 0.5) / 0.25
+        return Color3.fromRGB(200, math.floor(180 * t), 0)
     elseif pct > 0.25 then
-        return Color3.fromRGB(200, math.floor(100 * ((pct - 0.25) / 0.25)), 0)
+        local t = (pct - 0.25) / 0.25
+        return Color3.fromRGB(200, math.floor(100 * t), 0)
     else
-        return Color3.fromRGB(math.floor(100 + 80 * (pct / 0.25)), 0, 0)
+        local t = pct / 0.25
+        return Color3.fromRGB(math.floor(100 + 80 * t), 0, 0)
     end
 end
 
@@ -145,10 +147,17 @@ RAYCAST_PARAMS.FilterType = Enum.RaycastFilterType.Exclude
 local Box = {}
 Box.__index = Box
 
+local GLOW_PAD_MAX = 20
+
 function Box.new(features)
     local self      = setmetatable({}, Box)
     self._features  = features
     self._smoothPct = 1
+
+    -- ZIndex layout (ascending = renders on top):
+    -- glows (lowest) → glowMask → outer → border/fill → inner → labels
+    -- The glowMask is a fully opaque black frame that sits exactly over the
+    -- box interior, punching out the glow center so it only shows around edges.
 
     self._outer  = makeFrame(gui, CFG.OutlineColor, CFG.OutlineThick)
     self._border = makeFrame(gui, CFG.BorderColor,  CFG.BorderThick)
@@ -168,11 +177,23 @@ function Box.new(features)
             glow.Image                = "rbxassetid://126327713982623"
             glow.ImageColor3          = CFG.GlowColor
             glow.ImageTransparency    = alpha
-            glow.ZIndex               = self._outer.ZIndex - 1 - (n - i)
+            -- All glow layers sit below the mask, which sits below the box frames
+            glow.ZIndex               = self._outer.ZIndex - 2 - (n - i)
             glow.Visible              = false
             glow.Parent               = gui
             self._glows[i] = { img = glow, baseAlpha = alpha }
         end
+
+        -- Opaque mask frame: same ZIndex as outer - 1 (above all glows, below box)
+        -- Blocks the glow from showing through the box interior
+        local mask                    = Instance.new("Frame")
+        mask.BackgroundColor3         = Color3.fromRGB(0, 0, 0)
+        mask.BackgroundTransparency   = 0
+        mask.BorderSizePixel          = 0
+        mask.ZIndex                   = self._outer.ZIndex - 1
+        mask.Visible                  = false
+        mask.Parent                   = gui
+        self._glowMask                = mask
     end
 
     if features.fill then
@@ -277,18 +298,20 @@ function Box.new(features)
     return self
 end
 
-local function applyGlowLayers(glows, x, y, w, h)
+local function applyGlowLayers(glows, mask, x, y, w, h)
     if not glows then return end
-    -- Clamp pad: at least GlowMinPad (visible at distance),
-    -- at most GlowMaxPadRatio * min(w,h) (no bleed at close range)
-    local dim    = math.min(w, h)
-    local maxPad = dim * CFG.GlowMaxPadRatio
-    local base   = math.clamp(dim * CFG.GlowPadScale, CFG.GlowMinPad, maxPad)
+    local base = math.min(math.min(w, h) * CFG.GlowPadScale, GLOW_PAD_MAX)
     for i, entry in ipairs(glows) do
         local pad = base * i
         entry.img.Position = UDim2.fromOffset(x - pad, y - pad)
         entry.img.Size     = UDim2.fromOffset(w + pad * 2, h + pad * 2)
         entry.img.Visible  = true
+    end
+    -- Mask covers the exact box interior, blocking glow bleed-through
+    if mask then
+        mask.Position = UDim2.fromOffset(x, y)
+        mask.Size     = UDim2.fromOffset(w, h)
+        mask.Visible  = true
     end
 end
 
@@ -301,6 +324,10 @@ function Box:SetTransparency(t)
         for _, entry in ipairs(self._glows) do
             entry.img.ImageTransparency = entry.baseAlpha + (1 - entry.baseAlpha) * t1
         end
+    end
+    -- Fade mask alongside the box so it disappears on death fade
+    if self._glowMask then
+        self._glowMask.BackgroundTransparency = t1
     end
     if self._fill  then self._fill.ImageTransparency  = self._fillBaseAlpha + (1 - self._fillBaseAlpha) * t1 end
     if self._name  then
@@ -344,20 +371,19 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
 
     if _rainbowEnabled then
         local c = CFG.BorderColor
-        -- Border stroke only; outer/inner remain OutlineColor (black)
         self._borderStroke.Color = c
         if self._fill  then self._fill.ImageColor3  = c end
         if self._glows then
             for _, entry in ipairs(self._glows) do entry.img.ImageColor3 = c end
         end
-        if self._name   then self._name.TextColor3              = c end
-        if self._dist   then self._dist.TextColor3              = c end
-        if self._hpFill then self._hpFill.BackgroundColor3      = c end
-        if self._hpText then self._hpText.TextColor3            = c end
-        if self._lines  then
+        if self._name  then self._name.TextColor3   = c end
+        if self._dist  then self._dist.TextColor3   = c end
+        if self._hpFill then self._hpFill.BackgroundColor3 = c end
+        if self._hpText then self._hpText.TextColor3       = c end
+        if self._lines then
             for _, line in ipairs(self._lines) do line.BackgroundColor3 = c end
         end
-        if self._chams  then
+        if self._chams then
             for _, adorn in pairs(self._chams) do adorn.Color3 = c end
         end
     end
@@ -374,7 +400,7 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     self._inner.Size      = UDim2.fromOffset(w - 2, h - 2)
     self._inner.Visible   = true
 
-    applyGlowLayers(self._glows, x, y, w, h)
+    applyGlowLayers(self._glows, self._glowMask, x, y, w, h)
 
     if f.name and self._name then
         self._name.Position = UDim2.fromOffset(x + w * 0.5, y - 2)
@@ -453,7 +479,8 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
         local root = character:FindFirstChild("HumanoidRootPart")
         if root then
             RAYCAST_PARAMS.FilterDescendantsInstances = {character}
-            isVisible = workspace:Raycast(Camera.CFrame.Position, root.Position - Camera.CFrame.Position, RAYCAST_PARAMS) == nil
+            local result = workspace:Raycast(Camera.CFrame.Position, root.Position - Camera.CFrame.Position, RAYCAST_PARAMS)
+            isVisible    = result == nil
         end
         local chamColor = _rainbowEnabled and CFG.ChamVisibleColor
             or (f.chamsVisibleCheck and (isVisible and CFG.ChamVisibleColor or CFG.ChamOccludedColor)
@@ -489,14 +516,15 @@ function Box:Hide()
     self._outer.Visible  = false
     self._border.Visible = false
     self._inner.Visible  = false
-    if self._glows  then for _, e in ipairs(self._glows) do e.img.Visible = false end end
-    if self._name   then self._name.Visible   = false end
-    if self._dist   then self._dist.Visible   = false end
-    if self._hpBg   then self._hpBg.Visible   = false end
-    if self._hpFill then self._hpFill.Visible = false end
-    if self._hpText then self._hpText.Visible = false end
-    if self._lines  then for _, l in ipairs(self._lines) do l.Visible = false end end
-    if self._chams  then
+    if self._glows    then for _, e in ipairs(self._glows) do e.img.Visible = false end end
+    if self._glowMask then self._glowMask.Visible = false end
+    if self._name     then self._name.Visible     = false end
+    if self._dist     then self._dist.Visible     = false end
+    if self._hpBg     then self._hpBg.Visible     = false end
+    if self._hpFill   then self._hpFill.Visible   = false end
+    if self._hpText   then self._hpText.Visible   = false end
+    if self._lines    then for _, l in ipairs(self._lines) do l.Visible = false end end
+    if self._chams    then
         for _, adorn in pairs(self._chams) do pcall(function() adorn.Transparency = 1 end) end
     end
 end
@@ -505,13 +533,14 @@ function Box:Destroy()
     self._outer:Destroy()
     self._border:Destroy()
     self._inner:Destroy()
-    if self._glows  then for _, e in ipairs(self._glows) do e.img:Destroy() end end
-    if self._name   then self._name:Destroy()   end
-    if self._dist   then self._dist:Destroy()   end
-    if self._hpBg   then self._hpBg:Destroy()   end
-    if self._hpFill then self._hpFill:Destroy() end
-    if self._hpText then self._hpText:Destroy() end
-    if self._lines  then
+    if self._glows    then for _, e in ipairs(self._glows) do e.img:Destroy() end end
+    if self._glowMask then self._glowMask:Destroy() end
+    if self._name     then self._name:Destroy()     end
+    if self._dist     then self._dist:Destroy()     end
+    if self._hpBg     then self._hpBg:Destroy()     end
+    if self._hpFill   then self._hpFill:Destroy()   end
+    if self._hpText   then self._hpText:Destroy()   end
+    if self._lines    then
         for _, l in ipairs(self._lines) do l:Destroy() end
         table.clear(self._lines)
     end
@@ -537,7 +566,7 @@ local function GetBoundingBox(character)
     for _, part in ipairs(character:GetChildren()) do
         if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
             local cf = part.CFrame
-            local hX, hY, hZ = part.Size.X*.5, part.Size.Y*.5, part.Size.Z*.5
+            local hX, hY, hZ = part.Size.X * 0.5, part.Size.Y * 0.5, part.Size.Z * 0.5
             for _, o in ipairs(OFFSETS) do
                 local screen, vis = Camera:WorldToViewportPoint(cf * Vector3.new(o.X*hX, o.Y*hY, o.Z*hZ))
                 if vis then
@@ -597,8 +626,6 @@ function ESP.new(features)
     if features.ChamTransparency  then CFG.ChamTransparency  = features.ChamTransparency  end
     if features.GlowColor         then CFG.GlowColor         = features.GlowColor         end
     if features.GlowPadScale      then CFG.GlowPadScale      = features.GlowPadScale      end
-    if features.GlowMinPad        then CFG.GlowMinPad        = features.GlowMinPad        end
-    if features.GlowMaxPadRatio   then CFG.GlowMaxPadRatio   = features.GlowMaxPadRatio   end
     if features.GlowLayers        then CFG.GlowLayers        = features.GlowLayers        end
     if features.GlowBaseAlpha     then CFG.GlowBaseAlpha     = features.GlowBaseAlpha     end
     if features.GlowFalloff       then CFG.GlowFalloff       = features.GlowFalloff       end
