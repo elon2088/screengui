@@ -200,7 +200,7 @@ if features.fill then
     fill.BorderSizePixel        = 0
     fill.Size                   = UDim2.fromScale(1, 1)
     fill.Position               = UDim2.fromScale(0, 0)
-    fill.Image                  = "rbxassetid://14514122503"
+    fill.Image                  = "rbxassetid://2250066939"
     fill.ImageColor3            = CFG.FillColor
     fill.ImageTransparency      = CFG.FillAlpha 
     fill.ScaleType              = Enum.ScaleType.Stretch
