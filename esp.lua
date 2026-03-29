@@ -186,7 +186,7 @@ function Box.new(features)
 
         local mask                    = Instance.new("Frame")
         mask.BackgroundColor3         = Color3.fromRGB(0, 0, 0)
-        mask.BackgroundTransparency   = 1
+        mask.BackgroundTransparency   = 0
         mask.BorderSizePixel          = 0
         mask.ZIndex                   = self._outer.ZIndex - 1
         mask.Visible                  = false
@@ -194,21 +194,21 @@ function Box.new(features)
         self._glowMask                = mask
     end
 
-    if features.fill then
-        local fill                  = Instance.new("ImageLabel")
-        fill.BackgroundTransparency = 111
-        fill.BorderSizePixel        = 0
-        fill.Size                   = UDim2.fromScale(1, 1)
-        fill.Position               = UDim2.fromScale(0, 0)
-        fill.Image                  = "rbxassetid://14514122503"
-        fill.ImageColor3            = CFG.FillColor
-        fill.ImageTransparency      = CFG.FillAlpha
-        fill.ScaleType              = Enum.ScaleType.Stretch
-        fill.ZIndex                 = self._border.ZIndex - 1
-        fill.Parent                 = self._border
-        self._fill                  = fill
-        self._fillBaseAlpha         = CFG.FillAlpha
-    end
+if features.fill then
+    local fill                  = Instance.new("ImageLabel")
+    fill.BackgroundTransparency = 1 
+    fill.BorderSizePixel        = 0
+    fill.Size                   = UDim2.fromScale(1, 1)
+    fill.Position               = UDim2.fromScale(0, 0)
+    fill.Image                  = "rbxassetid://14514122503"
+    fill.ImageColor3            = CFG.FillColor
+    fill.ImageTransparency      = CFG.FillAlpha 
+    fill.ScaleType              = Enum.ScaleType.Stretch
+    fill.ZIndex                 = self._border.ZIndex - 1
+    fill.Parent                 = self._border
+    self._fill                  = fill
+    self._fillBaseAlpha         = CFG.FillAlpha
+end
 
     if features.name then
         local name                  = Instance.new("TextLabel")
