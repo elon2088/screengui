@@ -188,10 +188,11 @@ function Box.new(features)
         self._glowMask                = mask
     end
 
-    if features.fill then
+    -- FIX: Only create the FillFrame if the feature is enabled
+    if features.fill == true then
         local fill                  = Instance.new("Frame")
         fill.Name                   = "FillFrame"
-        fill.BackgroundTransparency = 1 -- Fix: Frame must be transparent to stop black overlay
+        fill.BackgroundTransparency = 1 -- Fix: Frame background is now transparent
         fill.BorderSizePixel        = 0
         fill.Size                   = UDim2.fromScale(1, 1)
         fill.Position               = UDim2.fromScale(0, 0)
@@ -380,7 +381,7 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     if _rainbowEnabled then
         local c = CFG.BorderColor
         self._borderStroke.Color = c
-        if self._fillGradient then self._fillGradient.Color = ColorSequence.new(c) end -- Fix: Rainbow color sequence
+        if self._fillGradient then self._fillGradient.Color = ColorSequence.new(c) end
         if self._glows then
             for _, entry in ipairs(self._glows) do entry.img.ImageColor3 = c end
         end
@@ -409,6 +410,11 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     self._inner.Visible   = true
 
     applyGlowLayers(self._glows, self._glowMask, x, y, w, h)
+
+    -- FIX: Visibility control for fill frame
+    if self._fill then
+        self._fill.Visible = f.fill == true
+    end
 
     if f.name and self._name then
         self._name.Position = UDim2.fromOffset(x + w * 0.5, y - 2)
