@@ -190,8 +190,8 @@ function Box.new(features)
 
     if features.fill then
         local fill                  = Instance.new("Frame")
-        fill.BackgroundColor3       = CFG.FillColor
-        fill.BackgroundTransparency = 0
+        fill.Name                   = "FillFrame"
+        fill.BackgroundTransparency = 1 -- Fix: Frame must be transparent to stop black overlay
         fill.BorderSizePixel        = 0
         fill.Size                   = UDim2.fromScale(1, 1)
         fill.Position               = UDim2.fromScale(0, 0)
@@ -200,6 +200,7 @@ function Box.new(features)
 
         local gradient              = Instance.new("UIGradient")
         gradient.Rotation           = 90
+        gradient.Color              = ColorSequence.new(CFG.FillColor)
         gradient.Transparency       = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 1),
             NumberSequenceKeypoint.new(1, CFG.FillAlpha)
@@ -379,7 +380,7 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     if _rainbowEnabled then
         local c = CFG.BorderColor
         self._borderStroke.Color = c
-        if self._fill  then self._fill.BackgroundColor3  = c end
+        if self._fillGradient then self._fillGradient.Color = ColorSequence.new(c) end -- Fix: Rainbow color sequence
         if self._glows then
             for _, entry in ipairs(self._glows) do entry.img.ImageColor3 = c end
         end
