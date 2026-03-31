@@ -26,9 +26,9 @@ local CFG = {
     ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
-    GlowPadScale       = 0.08,   -- base pad = min(w,h) * this
-    GlowMinPad         = 4,      -- minimum pad in pixels (keeps glow visible at distance)
-    GlowMaxPadRatio    = 0.18,   -- pad capped at this fraction of min(w,h) (prevents close bleed)
+    GlowPadScale       = 0.08,
+    GlowMinPad         = 4,
+    GlowMaxPadRatio    = 0.18,
     GlowLayers         = 2,
     GlowBaseAlpha      = 0.0,
     GlowFalloff        = 0.35,
@@ -263,15 +263,14 @@ function Box.new(features)
     return self
 end
 
--- Pad is clamped between GlowMinPad (always visible at distance) and
--- GlowMaxPadRatio * min(w,h) (prevents the glow image center from bleeding
--- inside the box when up close). Each outer layer multiplies the pad by its
--- index so layers spread evenly outward.
 local function applyGlowLayers(glows, x, y, w, h)
     if not glows then return end
     local dim    = math.min(w, h)
-    local maxPad = dim * CFG.GlowMaxPadRatio
-    local base   = math.clamp(dim * CFG.GlowPadScale, CFG.GlowMinPad, maxPad)
+    local minPad = CFG.GlowMinPad
+    -- math.max ensures maxPad is never less than minPad, preventing clamp errors
+    -- when the box is tiny (far away / side-on)
+    local maxPad = math.max(dim * CFG.GlowMaxPadRatio, minPad)
+    local base   = math.clamp(dim * CFG.GlowPadScale, minPad, maxPad)
     for i, entry in ipairs(glows) do
         local pad = base * i
         entry.img.Position = UDim2.fromOffset(x - pad, y - pad)
