@@ -22,7 +22,7 @@ local Camera = workspace.CurrentCamera
 local Viewmodels = workspace:WaitForChild("Viewmodels")
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Sonder_ESP_V3"
+ScreenGui.Name = "Sonder_ESP_V4"
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
 
@@ -40,12 +40,14 @@ function BoxEntry.new(model)
     self.Root.Visible = false
     self.Root.Parent = ScreenGui
     
+
     self.Box = Instance.new("UIStroke")
     self.Box.Thickness = 1
     self.Box.Color = ESP.BoxColor
     self.Box.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     self.Box.Parent = self.Root
     
+
     self.Outline = Instance.new("UIStroke")
     self.Outline.Thickness = 2
     self.Outline.Color = Color3.new(0, 0, 0)
@@ -73,6 +75,37 @@ function BoxEntry.new(model)
     return self
 end
 
+
+local function GetPerfectBoundingBox(model)
+    local orientation, size = model:GetBoundingBox()
+    local corners = {
+        orientation * CFrame.new(size.X/2, size.Y/2, size.Z/2),
+        orientation * CFrame.new(-size.X/2, size.Y/2, size.Z/2),
+        orientation * CFrame.new(size.X/2, -size.Y/2, size.Z/2),
+        orientation * CFrame.new(-size.X/2, -size.Y/2, size.Z/2),
+        orientation * CFrame.new(size.X/2, size.Y/2, -size.Z/2),
+        orientation * CFrame.new(-size.X/2, size.Y/2, -size.Z/2),
+        orientation * CFrame.new(size.X/2, -size.Y/2, -size.Z/2),
+        orientation * CFrame.new(-size.X/2, -size.Y/2, -size.Z/2)
+    }
+
+    local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
+    local anyOnScreen = false
+
+    for _, corner in ipairs(corners) do
+        local screenPos, onScreen = Camera:WorldToViewportPoint(corner.Position)
+        if onScreen then
+            anyOnScreen = true
+        end
+        minX = math.min(minX, screenPos.X)
+        minY = math.min(minY, screenPos.Y)
+        maxX = math.max(maxX, screenPos.X)
+        maxY = math.max(maxY, screenPos.Y)
+    end
+
+    return anyOnScreen, Vector2.new(minX, minY), Vector2.new(maxX - minX, maxY - minY)
+end
+
 function BoxEntry:GetWeapon()
     for _, child in ipairs(self.Model:GetChildren()) do
         if child:IsA("Model") and child:GetAttribute("item_type") then
@@ -86,50 +119,37 @@ function BoxEntry:Update()
     if self.IsFading then return end
     
     local head = self.Model:FindFirstChild("head")
+
     if not head or head:FindFirstChild("Username") then
         self:Fade()
         return
     end
 
-    local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
-    local found = false
-    
-    for _, part in ipairs(self.Model:GetChildren()) do
-        if part:IsA("BasePart") then
-            local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-            if onScreen then
-                found = true
-                minX = math.min(minX, screenPos.X)
-                minY = math.min(minY, screenPos.Y)
-                maxX = math.max(maxX, screenPos.X)
-                maxY = math.max(maxY, screenPos.Y)
-            end
-        end
-    end
+    local onScreen, pos, size = GetPerfectBoundingBox(self.Model)
 
-    if found then
-        local w, h = maxX - minX, maxY - minY
+    if onScreen then
         local dist = (Camera.CFrame.Position - head.Position).Magnitude
         
-        self.Root.Position = UDim2.fromOffset(minX, minY)
-        self.Root.Size = UDim2.fromOffset(w, h)
+        self.Root.Position = UDim2.fromOffset(pos.X, pos.Y)
+        self.Root.Size = UDim2.fromOffset(size.X, size.Y)
         
         self.Root.BackgroundTransparency = ESP.Fill and ESP.FillTransparency or 1
         self.Root.BackgroundColor3 = ESP.FillColor
         
         self.Box.Enabled = ESP.Box
+        self.Box.Color = ESP.BoxColor
         self.Outline.Enabled = ESP.Box
         
 
-        local padding = 4
+        local pad = 4
         self.WeaponLabel.Visible = ESP.Weapon
         self.WeaponLabel.Text = "[" .. self:GetWeapon() .. "]"
-        self.WeaponLabel.Position = UDim2.new(0.5, 0, 1, padding)
+        self.WeaponLabel.Position = UDim2.new(0.5, 0, 1, pad)
         
         self.DistanceLabel.Visible = ESP.Distance
         self.DistanceLabel.Text = math.floor(dist) .. "st"
-        local distOffset = ESP.Weapon and (padding + 12) or padding
-        self.DistanceLabel.Position = UDim2.new(0.5, 0, 1, distOffset)
+        local dPad = ESP.Weapon and (pad + 12) or pad
+        self.DistanceLabel.Position = UDim2.new(0.5, 0, 1, dPad)
         
         self.Root.Visible = true
     else
@@ -142,21 +162,22 @@ function BoxEntry:Fade()
     self.IsFading = true
     
 
-    local lockedPos = self.Root.Position
-    local lockedSize = self.Root.Size
+    local fadePos = self.Root.Position
+    local fadeSize = self.Root.Size
     
     task.spawn(function()
         local start = tick()
         while tick() - start < ESP.FadeTime do
-            local alpha = (tick() - start) / ESP.FadeTime
+            local elapsed = tick() - start
+            local alpha = elapsed / ESP.FadeTime
+            
+            self.Root.Position = fadePos
+            self.Root.Size = fadeSize
             
 
-            self.Root.Position = lockedPos
-            self.Root.Size = lockedSize
+            local currentFill = ESP.FillTransparency + (alpha * (1 - ESP.FillTransparency))
+            self.Root.BackgroundTransparency = math.clamp(currentFill, 0, 1)
             
-
-            local fillAlpha = ESP.FillTransparency + (alpha * (1 - ESP.FillTransparency))
-            self.Root.BackgroundTransparency = math.clamp(fillAlpha, 0, 1)
             self.Box.Transparency = alpha
             self.Outline.Transparency = alpha
             self.WeaponLabel.TextTransparency = alpha
@@ -188,6 +209,7 @@ function ESP:Init()
             end
         end
         
+
         for model, entry in pairs(self.Cache) do
             if not model:IsDescendantOf(Viewmodels) then
                 entry:Fade()
