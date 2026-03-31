@@ -22,13 +22,11 @@ local CFG = {
     SkeletonColor      = Color3.fromRGB(255, 255, 255),
     SkeletonThick      = 1,
     SkeletonAlpha      = 0,
-    ChamVisibleColor   = Color3.fromRGB(0, 150, 255),
+    ChamVisibleColor   = Color3.fromRGB(255, 0, 0), -- set to red as requested
     ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
     GlowPadScale       = 0.08,
-    GlowMinPad         = 4,
-    GlowMaxPadRatio    = 0.18,
     GlowLayers         = 2,
     GlowBaseAlpha      = 0.0,
     GlowFalloff        = 0.35,
@@ -147,6 +145,8 @@ RAYCAST_PARAMS.FilterType = Enum.RaycastFilterType.Exclude
 local Box = {}
 Box.__index = Box
 
+local GLOW_PAD_MAX = 20
+
 function Box.new(features)
     local self      = setmetatable({}, Box)
     self._features  = features
@@ -170,7 +170,7 @@ function Box.new(features)
             glow.Image                = "rbxassetid://126327713982623"
             glow.ImageColor3          = CFG.GlowColor
             glow.ImageTransparency    = alpha
-            glow.ZIndex               = self._outer.ZIndex - 2 - (n - i)
+            glow.ZIndex               = -10 -- forced low ZIndex to stay behind ESP
             glow.Visible              = false
             glow.Parent               = gui
             self._glows[i] = { img = glow, baseAlpha = alpha }
@@ -191,7 +191,7 @@ function Box.new(features)
         name.TextXAlignment         = Enum.TextXAlignment.Center
         name.Text                   = ""
         name.Visible                = false
-        name.ZIndex                 = self._border.ZIndex + 1
+        name.ZIndex                 = 10
         name.Parent                 = gui
         self._name                  = name
     end
@@ -210,7 +210,7 @@ function Box.new(features)
         dist.TextXAlignment         = Enum.TextXAlignment.Center
         dist.Text                   = ""
         dist.Visible                = false
-        dist.ZIndex                 = self._border.ZIndex + 1
+        dist.ZIndex                 = 10
         dist.Parent                 = gui
         self._dist                  = dist
     end
@@ -220,7 +220,7 @@ function Box.new(features)
         hpBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
         hpBg.BorderSizePixel  = 0
         hpBg.Visible          = false
-        hpBg.ZIndex           = self._border.ZIndex + 1
+        hpBg.ZIndex           = 9
         hpBg.Parent           = gui
         self._hpBg            = hpBg
 
@@ -229,7 +229,7 @@ function Box.new(features)
         hpFill.BorderSizePixel  = 0
         hpFill.AnchorPoint      = Vector2.new(0, 0)
         hpFill.Visible          = false
-        hpFill.ZIndex           = self._border.ZIndex + 2
+        hpFill.ZIndex           = 10
         hpFill.Parent           = gui
         self._hpFill            = hpFill
 
@@ -247,7 +247,7 @@ function Box.new(features)
             hpText.TextXAlignment         = Enum.TextXAlignment.Right
             hpText.Text                   = ""
             hpText.Visible                = false
-            hpText.ZIndex                 = self._border.ZIndex + 3
+            hpText.ZIndex                 = 11
             hpText.Parent                 = gui
             self._hpText                  = hpText
         end
@@ -265,12 +265,7 @@ end
 
 local function applyGlowLayers(glows, x, y, w, h)
     if not glows then return end
-    local dim    = math.min(w, h)
-    local minPad = CFG.GlowMinPad
-    -- math.max ensures maxPad is never less than minPad, preventing clamp errors
-    -- when the box is tiny (far away / side-on)
-    local maxPad = math.max(dim * CFG.GlowMaxPadRatio, minPad)
-    local base   = math.clamp(dim * CFG.GlowPadScale, minPad, maxPad)
+    local base = math.min(math.min(w, h) * CFG.GlowPadScale, GLOW_PAD_MAX)
     for i, entry in ipairs(glows) do
         local pad = base * i
         entry.img.Position = UDim2.fromOffset(x - pad, y - pad)
@@ -289,6 +284,7 @@ function Box:SetTransparency(t)
             entry.img.ImageTransparency = entry.baseAlpha + (1 - entry.baseAlpha) * t1
         end
     end
+
     if self._name  then
         self._name.TextTransparency       = t1
         self._name.TextStrokeTransparency = t1
@@ -334,14 +330,14 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
         if self._glows then
             for _, entry in ipairs(self._glows) do entry.img.ImageColor3 = c end
         end
-        if self._name   then self._name.TextColor3              = c end
-        if self._dist   then self._dist.TextColor3              = c end
-        if self._hpFill then self._hpFill.BackgroundColor3      = c end
-        if self._hpText then self._hpText.TextColor3            = c end
-        if self._lines  then
+        if self._name  then self._name.TextColor3   = c end
+        if self._dist  then self._dist.TextColor3   = c end
+        if self._hpFill then self._hpFill.BackgroundColor3 = c end
+        if self._hpText then self._hpText.TextColor3       = c end
+        if self._lines then
             for _, line in ipairs(self._lines) do line.BackgroundColor3 = c end
         end
-        if self._chams  then
+        if self._chams then
             for _, adorn in pairs(self._chams) do adorn.Color3 = c end
         end
     end
@@ -433,33 +429,34 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     end
 
     if f.chams and self._chams and character then
-        local isVisible = false
-        local root = character:FindFirstChild("HumanoidRootPart")
-        if root then
-            RAYCAST_PARAMS.FilterDescendantsInstances = {character}
-            isVisible = workspace:Raycast(Camera.CFrame.Position, root.Position - Camera.CFrame.Position, RAYCAST_PARAMS) == nil
-        end
-        local chamColor = _rainbowEnabled and CFG.ChamVisibleColor
-            or (f.chamsVisibleCheck and (isVisible and CFG.ChamVisibleColor or CFG.ChamOccludedColor)
-            or CFG.ChamVisibleColor)
         local activeParts = {}
         for _, part in ipairs(character:GetChildren()) do
             if part:IsA("BasePart") then
-                activeParts[part] = true
-                local adorn = self._chams[part]
-                if not adorn then
-                    adorn             = Instance.new("BoxHandleAdornment")
-                    adorn.AlwaysOnTop = true
-                    adorn.ZIndex      = 5
-                    adorn.Adornee     = part
-                    adorn.Parent      = part
-                    self._chams[part] = adorn
+                -- HITSCAN CHECK: Only show chams for parts that the camera can actually see
+                RAYCAST_PARAMS.FilterDescendantsInstances = {LocalPlayer.Character, character}
+                local result = workspace:Raycast(Camera.CFrame.Position, part.Position - Camera.CFrame.Position, RAYCAST_PARAMS)
+                
+                local isPartVisible = (result == nil)
+
+                if isPartVisible then
+                    activeParts[part] = true
+                    local adorn = self._chams[part]
+                    if not adorn then
+                        adorn             = Instance.new("BoxHandleAdornment")
+                        adorn.AlwaysOnTop = true
+                        adorn.ZIndex      = 5
+                        adorn.Adornee      = part
+                        adorn.Parent      = part
+                        self._chams[part] = adorn
+                    end
+                    adorn.Size         = part.Size + Vector3.new(0.02, 0.02, 0.02)
+                    adorn.Color3       = CFG.ChamVisibleColor
+                    adorn.Transparency = CFG.ChamTransparency
                 end
-                adorn.Size         = part.Size + Vector3.new(0.02, 0.02, 0.02)
-                adorn.Color3       = chamColor
-                adorn.Transparency = CFG.ChamTransparency
             end
         end
+        
+        -- Clean up parts that are no longer visible or part of character
         for part, adorn in pairs(self._chams) do
             if not activeParts[part] then
                 pcall(function() adorn:Destroy() end)
@@ -473,14 +470,14 @@ function Box:Hide()
     self._outer.Visible  = false
     self._border.Visible = false
     self._inner.Visible  = false
-    if self._glows  then for _, e in ipairs(self._glows) do e.img.Visible = false end end
-    if self._name   then self._name.Visible   = false end
-    if self._dist   then self._dist.Visible   = false end
-    if self._hpBg   then self._hpBg.Visible   = false end
-    if self._hpFill then self._hpFill.Visible = false end
-    if self._hpText then self._hpText.Visible = false end
-    if self._lines  then for _, l in ipairs(self._lines) do l.Visible = false end end
-    if self._chams  then
+    if self._glows    then for _, e in ipairs(self._glows) do e.img.Visible = false end end
+    if self._name     then self._name.Visible     = false end
+    if self._dist     then self._dist.Visible     = false end
+    if self._hpBg     then self._hpBg.Visible     = false end
+    if self._hpFill   then self._hpFill.Visible   = false end
+    if self._hpText   then self._hpText.Visible   = false end
+    if self._lines    then for _, l in ipairs(self._lines) do l.Visible = false end end
+    if self._chams    then
         for _, adorn in pairs(self._chams) do pcall(function() adorn.Transparency = 1 end) end
     end
 end
@@ -489,13 +486,13 @@ function Box:Destroy()
     self._outer:Destroy()
     self._border:Destroy()
     self._inner:Destroy()
-    if self._glows  then for _, e in ipairs(self._glows) do e.img:Destroy() end end
-    if self._name   then self._name:Destroy()   end
-    if self._dist   then self._dist:Destroy()   end
-    if self._hpBg   then self._hpBg:Destroy()   end
-    if self._hpFill then self._hpFill:Destroy() end
-    if self._hpText then self._hpText:Destroy() end
-    if self._lines  then
+    if self._glows    then for _, e in ipairs(self._glows) do e.img:Destroy() end end
+    if self._name     then self._name:Destroy()     end
+    if self._dist     then self._dist:Destroy()     end
+    if self._hpBg     then self._hpBg:Destroy()     end
+    if self._hpFill   then self._hpFill:Destroy()   end
+    if self._hpText   then self._hpText:Destroy()   end
+    if self._lines    then
         for _, l in ipairs(self._lines) do l:Destroy() end
         table.clear(self._lines)
     end
@@ -521,7 +518,7 @@ local function GetBoundingBox(character)
     for _, part in ipairs(character:GetChildren()) do
         if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
             local cf = part.CFrame
-            local hX, hY, hZ = part.Size.X*.5, part.Size.Y*.5, part.Size.Z*.5
+            local hX, hY, hZ = part.Size.X * 0.5, part.Size.Y * 0.5, part.Size.Z * 0.5
             for _, o in ipairs(OFFSETS) do
                 local screen, vis = Camera:WorldToViewportPoint(cf * Vector3.new(o.X*hX, o.Y*hY, o.Z*hZ))
                 if vis then
@@ -578,8 +575,6 @@ function ESP.new(features)
     if features.ChamTransparency  then CFG.ChamTransparency  = features.ChamTransparency  end
     if features.GlowColor         then CFG.GlowColor         = features.GlowColor         end
     if features.GlowPadScale      then CFG.GlowPadScale      = features.GlowPadScale      end
-    if features.GlowMinPad        then CFG.GlowMinPad        = features.GlowMinPad        end
-    if features.GlowMaxPadRatio   then CFG.GlowMaxPadRatio   = features.GlowMaxPadRatio   end
     if features.GlowLayers        then CFG.GlowLayers        = features.GlowLayers        end
     if features.GlowBaseAlpha     then CFG.GlowBaseAlpha     = features.GlowBaseAlpha     end
     if features.GlowFalloff       then CFG.GlowFalloff       = features.GlowFalloff       end
