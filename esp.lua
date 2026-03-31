@@ -120,7 +120,7 @@ local function makeLine()
     local f                  = Instance.new("Frame")
     f.BackgroundColor3       = CFG.SkeletonColor
     f.BackgroundTransparency = CFG.SkeletonAlpha
-    f.BorderSizePixel        = 1
+    f.BorderSizePixel        = 0
     f.AnchorPoint            = Vector2.new(0.5, 0.5)
     f.Visible                = false
     f.ZIndex                 = 2
@@ -154,6 +154,9 @@ function Box.new(features)
     self._features  = features
     self._smoothPct = 1
 
+
+    
+
     self._outer  = makeFrame(gui, CFG.OutlineColor, CFG.OutlineThick)
     self._border = makeFrame(gui, CFG.BorderColor,  CFG.BorderThick)
     self._inner  = makeFrame(gui, CFG.OutlineColor, CFG.OutlineThick)
@@ -172,15 +175,18 @@ function Box.new(features)
             glow.Image                = "rbxassetid://126327713982623"
             glow.ImageColor3          = CFG.GlowColor
             glow.ImageTransparency    = alpha
+
+            
             glow.ZIndex               = self._outer.ZIndex - 2 - (n - i)
             glow.Visible              = false
             glow.Parent               = gui
             self._glows[i] = { img = glow, baseAlpha = alpha }
         end
 
+
         local mask                    = Instance.new("Frame")
         mask.BackgroundColor3         = Color3.fromRGB(0, 0, 0)
-        mask.BackgroundTransparency   = 1
+        mask.BackgroundTransparency   = 0
         mask.BorderSizePixel          = 0
         mask.ZIndex                   = self._outer.ZIndex - 1
         mask.Visible                  = false
@@ -188,28 +194,19 @@ function Box.new(features)
         self._glowMask                = mask
     end
 
-    -- FIX: Only create the FillFrame if the feature is enabled
-    if features.fill == true then
-        local fill                  = Instance.new("Frame")
-        fill.Name                   = "FillFrame"
-        fill.BackgroundTransparency = 1 -- Fix: Frame background is now transparent
+    if features.fill then
+        local fill                  = Instance.new("ImageLabel")
+        fill.BackgroundTransparency = 111
         fill.BorderSizePixel        = 0
         fill.Size                   = UDim2.fromScale(1, 1)
         fill.Position               = UDim2.fromScale(0, 0)
+        fill.Image                  = "rbxassetid://14514122503"
+        fill.ImageColor3            = CFG.FillColor
+        fill.ImageTransparency      = CFG.FillAlpha
+        fill.ScaleType              = Enum.ScaleType.Stretch
         fill.ZIndex                 = self._border.ZIndex - 1
         fill.Parent                 = self._border
-
-        local gradient              = Instance.new("UIGradient")
-        gradient.Rotation           = 90
-        gradient.Color              = ColorSequence.new(CFG.FillColor)
-        gradient.Transparency       = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 1),
-            NumberSequenceKeypoint.new(1, CFG.FillAlpha)
-        })
-        gradient.Parent             = fill
-        
         self._fill                  = fill
-        self._fillGradient          = gradient
         self._fillBaseAlpha         = CFG.FillAlpha
     end
 
@@ -330,15 +327,7 @@ function Box:SetTransparency(t)
     if self._glowMask then
         self._glowMask.BackgroundTransparency = t1
     end
-    
-    if self._fill and self._fillGradient then 
-        local currentAlpha = self._fillBaseAlpha + (1 - self._fillBaseAlpha) * t1
-        self._fillGradient.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 1),
-            NumberSequenceKeypoint.new(1, currentAlpha)
-        })
-    end
-
+    if self._fill  then self._fill.ImageTransparency  = self._fillBaseAlpha + (1 - self._fillBaseAlpha) * t1 end
     if self._name  then
         self._name.TextTransparency       = t1
         self._name.TextStrokeTransparency = t1
@@ -381,7 +370,7 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     if _rainbowEnabled then
         local c = CFG.BorderColor
         self._borderStroke.Color = c
-        if self._fillGradient then self._fillGradient.Color = ColorSequence.new(c) end
+        if self._fill  then self._fill.ImageColor3  = c end
         if self._glows then
             for _, entry in ipairs(self._glows) do entry.img.ImageColor3 = c end
         end
@@ -410,11 +399,6 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     self._inner.Visible   = true
 
     applyGlowLayers(self._glows, self._glowMask, x, y, w, h)
-
-    -- FIX: Visibility control for fill frame
-    if self._fill then
-        self._fill.Visible = f.fill == true
-    end
 
     if f.name and self._name then
         self._name.Position = UDim2.fromOffset(x + w * 0.5, y - 2)
