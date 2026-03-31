@@ -179,8 +179,8 @@ function Box.new(features)
         end
 
         local mask                    = Instance.new("Frame")
-        mask.BackgroundColor3         = Color3.fromRGB(1, 0, 0)
-        mask.BackgroundTransparency   = 0
+        mask.BackgroundColor3         = Color3.fromRGB(0, 0, 0)
+        mask.BackgroundTransparency   = 1
         mask.BorderSizePixel          = 0
         mask.ZIndex                   = self._outer.ZIndex - 1
         mask.Visible                  = false
