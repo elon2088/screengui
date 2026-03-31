@@ -175,18 +175,8 @@ function Box.new(features)
             glow.Parent               = gui
             self._glows[i] = { img = glow, baseAlpha = alpha }
         end
-
-        local mask                    = Instance.new("Frame")
-        mask.BackgroundColor3         = Color3.fromRGB(0, 0, 0)
-        mask.BackgroundTransparency   = 0
-        mask.BorderSizePixel          = 0
-        mask.ZIndex                   = self._outer.ZIndex - 1
-        mask.Visible                  = false
-        mask.Parent                   = gui
-        self._glowMask                = mask
+        -- REMOVED GLOW MASK (THE CAUSE OF THE BLACK BOX)
     end
-
-    -- FILL REMOVED
 
     if features.name then
         local name                  = Instance.new("TextLabel")
@@ -274,7 +264,7 @@ function Box.new(features)
     return self
 end
 
-local function applyGlowLayers(glows, mask, x, y, w, h)
+local function applyGlowLayers(glows, x, y, w, h)
     if not glows then return end
     local base = math.min(math.min(w, h) * CFG.GlowPadScale, GLOW_PAD_MAX)
     for i, entry in ipairs(glows) do
@@ -282,12 +272,6 @@ local function applyGlowLayers(glows, mask, x, y, w, h)
         entry.img.Position = UDim2.fromOffset(x - pad, y - pad)
         entry.img.Size     = UDim2.fromOffset(w + pad * 2, h + pad * 2)
         entry.img.Visible  = true
-    end
-
-    if mask then
-        mask.Position = UDim2.fromOffset(x, y)
-        mask.Size     = UDim2.fromOffset(w, h)
-        mask.Visible  = true
     end
 end
 
@@ -300,10 +284,6 @@ function Box:SetTransparency(t)
         for _, entry in ipairs(self._glows) do
             entry.img.ImageTransparency = entry.baseAlpha + (1 - entry.baseAlpha) * t1
         end
-    end
-
-    if self._glowMask then
-        self._glowMask.BackgroundTransparency = t1
     end
 
     if self._name  then
@@ -375,7 +355,7 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     self._inner.Size      = UDim2.fromOffset(w - 2, h - 2)
     self._inner.Visible   = true
 
-    applyGlowLayers(self._glows, self._glowMask, x, y, w, h)
+    applyGlowLayers(self._glows, x, y, w, h)
 
     if f.name and self._name then
         self._name.Position = UDim2.fromOffset(x + w * 0.5, y - 2)
@@ -492,7 +472,6 @@ function Box:Hide()
     self._border.Visible = false
     self._inner.Visible  = false
     if self._glows    then for _, e in ipairs(self._glows) do e.img.Visible = false end end
-    if self._glowMask then self._glowMask.Visible = false end
     if self._name     then self._name.Visible     = false end
     if self._dist     then self._dist.Visible     = false end
     if self._hpBg     then self._hpBg.Visible     = false end
@@ -509,7 +488,6 @@ function Box:Destroy()
     self._border:Destroy()
     self._inner:Destroy()
     if self._glows    then for _, e in ipairs(self._glows) do e.img:Destroy() end end
-    if self._glowMask then self._glowMask:Destroy() end
     if self._name     then self._name:Destroy()     end
     if self._dist     then self._dist:Destroy()     end
     if self._hpBg     then self._hpBg:Destroy()     end
@@ -566,7 +544,6 @@ function ESP.new(features)
     local self = setmetatable({}, ESP)
 
     self._features = {
-        fill              = false, -- HARD REMOVED
         name              = features.name              ~= false,
         distance          = features.distance          ~= false,
         healthbar         = features.healthbar         ~= false,
