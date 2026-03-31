@@ -120,7 +120,7 @@ local function makeLine()
     local f                  = Instance.new("Frame")
     f.BackgroundColor3       = CFG.SkeletonColor
     f.BackgroundTransparency = CFG.SkeletonAlpha
-    f.BorderSizePixel        = 0
+    f.BorderSizePixel        = 1
     f.AnchorPoint            = Vector2.new(0.5, 0.5)
     f.Visible                = false
     f.ZIndex                 = 2
