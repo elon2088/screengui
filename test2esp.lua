@@ -7,12 +7,12 @@ local ESP = {
     
     BoxColor = Color3.fromRGB(255, 255, 255),
     FillColor = Color3.fromRGB(255, 255, 255),
-    FillTransparency = 0.5,
+    FillTransparency = 0.75,
     
     WeaponColor = Color3.fromRGB(202, 243, 255),
     DistanceColor = Color3.fromRGB(255, 255, 255),
     
-    FadeTime = 1.5,
+    FadeTime = 1.2,
     Cache = {}
 }
 
@@ -22,7 +22,7 @@ local Camera = workspace.CurrentCamera
 local Viewmodels = workspace:WaitForChild("Viewmodels")
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Sonder_ESP_V2"
+ScreenGui.Name = "Sonder_ESP_V3"
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
 
@@ -34,7 +34,6 @@ function BoxEntry.new(model)
     self.Model = model
     self.IsFading = false
     
-
     self.Root = Instance.new("Frame")
     self.Root.BorderSizePixel = 0
     self.Root.BackgroundTransparency = 1
@@ -47,12 +46,10 @@ function BoxEntry.new(model)
     self.Box.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     self.Box.Parent = self.Root
     
-
     self.Outline = Instance.new("UIStroke")
     self.Outline.Thickness = 2
     self.Outline.Color = Color3.new(0, 0, 0)
     self.Outline.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    self.Outline.Transparency = 0.5
     self.Outline.Parent = self.Root
     
     self.WeaponLabel = Instance.new("TextLabel")
@@ -117,23 +114,22 @@ function BoxEntry:Update()
         self.Root.Position = UDim2.fromOffset(minX, minY)
         self.Root.Size = UDim2.fromOffset(w, h)
         
-        -- Apply Fill Settings
         self.Root.BackgroundTransparency = ESP.Fill and ESP.FillTransparency or 1
         self.Root.BackgroundColor3 = ESP.FillColor
         
-        -- Apply Box Settings
         self.Box.Enabled = ESP.Box
-        self.Box.Color = ESP.BoxColor
         self.Outline.Enabled = ESP.Box
         
-        -- Labels
+
+        local padding = 4
         self.WeaponLabel.Visible = ESP.Weapon
         self.WeaponLabel.Text = "[" .. self:GetWeapon() .. "]"
-        self.WeaponLabel.Position = UDim2.new(0.5, 0, 1, 2)
+        self.WeaponLabel.Position = UDim2.new(0.5, 0, 1, padding)
         
         self.DistanceLabel.Visible = ESP.Distance
         self.DistanceLabel.Text = math.floor(dist) .. "st"
-        self.DistanceLabel.Position = UDim2.new(0.5, 0, 1, ESP.Weapon and 14 or 2)
+        local distOffset = ESP.Weapon and (padding + 12) or padding
+        self.DistanceLabel.Position = UDim2.new(0.5, 0, 1, distOffset)
         
         self.Root.Visible = true
     else
@@ -145,12 +141,22 @@ function BoxEntry:Fade()
     if self.IsFading then return end
     self.IsFading = true
     
+
+    local lockedPos = self.Root.Position
+    local lockedSize = self.Root.Size
+    
     task.spawn(function()
         local start = tick()
         while tick() - start < ESP.FadeTime do
             local alpha = (tick() - start) / ESP.FadeTime
             
-            self.Root.BackgroundTransparency = 1 - ((1 - ESP.FillTransparency) * (1 - alpha))
+
+            self.Root.Position = lockedPos
+            self.Root.Size = lockedSize
+            
+
+            local fillAlpha = ESP.FillTransparency + (alpha * (1 - ESP.FillTransparency))
+            self.Root.BackgroundTransparency = math.clamp(fillAlpha, 0, 1)
             self.Box.Transparency = alpha
             self.Outline.Transparency = alpha
             self.WeaponLabel.TextTransparency = alpha
@@ -171,10 +177,7 @@ end
 
 function ESP:Init()
     RunService.RenderStepped:Connect(function()
-        if not self.Enabled then 
-            for _, e in pairs(self.Cache) do e.Root.Visible = false end
-            return 
-        end
+        if not self.Enabled then return end
         
         for _, model in ipairs(Viewmodels:GetChildren()) do
             if model:IsA("Model") and model.Name ~= "LocalViewmodel" then
