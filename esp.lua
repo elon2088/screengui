@@ -11,8 +11,6 @@ local CFG = {
     OutlineColor       = Color3.fromRGB(0, 0, 0),
     BorderThick        = 0.9,
     OutlineThick       = 0.9,
-    FillColor          = Color3.fromRGB(255, 255, 255),
-    FillAlpha          = 0.4,
     NameColor          = Color3.fromRGB(255, 255, 255),
     NameSize           = 12,
     DistColor          = Color3.fromRGB(255, 255, 255),
@@ -40,7 +38,7 @@ local _rainbowHue     = 0
 local _rainbowConn    = nil
 
 local RAINBOW_KEYS = {
-    "BorderColor", "FillColor", "NameColor", "DistColor",
+    "BorderColor", "NameColor", "DistColor",
     "SkeletonColor", "ChamVisibleColor", "ChamOccludedColor", "GlowColor",
 }
 
@@ -154,9 +152,6 @@ function Box.new(features)
     self._features  = features
     self._smoothPct = 1
 
-
-    
-
     self._outer  = makeFrame(gui, CFG.OutlineColor, CFG.OutlineThick)
     self._border = makeFrame(gui, CFG.BorderColor,  CFG.BorderThick)
     self._inner  = makeFrame(gui, CFG.OutlineColor, CFG.OutlineThick)
@@ -175,14 +170,11 @@ function Box.new(features)
             glow.Image                = "rbxassetid://126327713982623"
             glow.ImageColor3          = CFG.GlowColor
             glow.ImageTransparency    = alpha
-
-            
             glow.ZIndex               = self._outer.ZIndex - 2 - (n - i)
             glow.Visible              = false
             glow.Parent               = gui
             self._glows[i] = { img = glow, baseAlpha = alpha }
         end
-
 
         local mask                    = Instance.new("Frame")
         mask.BackgroundColor3         = Color3.fromRGB(0, 0, 0)
@@ -194,21 +186,7 @@ function Box.new(features)
         self._glowMask                = mask
     end
 
-    if features.fill then
-        local fill                  = Instance.new("ImageLabel")
-        fill.BackgroundTransparency = 111
-        fill.BorderSizePixel        = 0
-        fill.Size                   = UDim2.fromScale(1, 1)
-        fill.Position               = UDim2.fromScale(0, 0)
-        fill.Image                  = "rbxassetid://14514122503"
-        fill.ImageColor3            = CFG.FillColor
-        fill.ImageTransparency      = CFG.FillAlpha
-        fill.ScaleType              = Enum.ScaleType.Stretch
-        fill.ZIndex                 = self._border.ZIndex - 1
-        fill.Parent                 = self._border
-        self._fill                  = fill
-        self._fillBaseAlpha         = CFG.FillAlpha
-    end
+    -- FILL REMOVED
 
     if features.name then
         local name                  = Instance.new("TextLabel")
@@ -327,7 +305,7 @@ function Box:SetTransparency(t)
     if self._glowMask then
         self._glowMask.BackgroundTransparency = t1
     end
-    if self._fill  then self._fill.ImageTransparency  = self._fillBaseAlpha + (1 - self._fillBaseAlpha) * t1 end
+
     if self._name  then
         self._name.TextTransparency       = t1
         self._name.TextStrokeTransparency = t1
@@ -370,7 +348,6 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     if _rainbowEnabled then
         local c = CFG.BorderColor
         self._borderStroke.Color = c
-        if self._fill  then self._fill.ImageColor3  = c end
         if self._glows then
             for _, entry in ipairs(self._glows) do entry.img.ImageColor3 = c end
         end
@@ -589,7 +566,7 @@ function ESP.new(features)
     local self = setmetatable({}, ESP)
 
     self._features = {
-        fill              = features.fill              ~= false,
+        fill              = false, -- HARD REMOVED
         name              = features.name              ~= false,
         distance          = features.distance          ~= false,
         healthbar         = features.healthbar         ~= false,
@@ -604,8 +581,6 @@ function ESP.new(features)
 
     if features.BorderColor       then CFG.BorderColor       = features.BorderColor       end
     if features.OutlineColor      then CFG.OutlineColor      = features.OutlineColor      end
-    if features.FillColor         then CFG.FillColor         = features.FillColor         end
-    if features.FillAlpha         then CFG.FillAlpha         = features.FillAlpha         end
     if features.NameColor         then CFG.NameColor         = features.NameColor         end
     if features.DistColor         then CFG.DistColor         = features.DistColor         end
     if features.BorderThick       then CFG.BorderThick       = features.BorderThick       end
