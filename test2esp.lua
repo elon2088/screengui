@@ -1,199 +1,183 @@
-local ESP = {
-    Enabled = true,
-    Box = true,
-    Fill = true,
-    Distance = true,
-    Weapon = true,
-    
-    BoxColor = Color3.fromRGB(255, 255, 255),
-    GradientColor = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 150, 150))
-    }),
-    FillTransparency = 0.7,
-    
-    WeaponColor = Color3.fromRGB(202, 243, 255),
-    DistanceColor = Color3.fromRGB(255, 255, 255),
-    
-    FadeTime = 1.0,
-    Cache = {}
+local ESP = {}
+ESP.__index = ESP
+
+local Players    = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Camera     = workspace.CurrentCamera
+
+local CFG = {
+    BoxColor         = Color3.fromRGB(255, 255, 255),
+    OutlineColor     = Color3.fromRGB(0, 0, 0),
+    WeaponColor      = Color3.fromRGB(202, 243, 255),
+    TextSize         = 11,
+    Font             = Enum.Font.Code,
+    FadeDuration     = 1.0, 
+    FillTransparency = 0.7
 }
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Camera = workspace.CurrentCamera
-local Viewmodels = workspace:WaitForChild("Viewmodels")
+local gui
+do
+    local existing = (gethui and gethui() or game:GetService("CoreGui")):FindFirstChild("Sonder_Final_ESP")
+    if existing then
+        gui = existing
+    else
+        gui                = Instance.new("ScreenGui")
+        gui.Name           = "Sonder_Final_ESP"
+        gui.ResetOnSpawn   = false
+        gui.IgnoreGuiInset = true
+        gui.Parent         = gethui and gethui() or game:GetService("CoreGui")
+    end
+end
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Sonder_ESP_V5"
-ScreenGui.IgnoreGuiInset = true
-ScreenGui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
+local Box = {}
+Box.__index = Box
 
-local BoxEntry = {}
-BoxEntry.__index = BoxEntry
-
-function BoxEntry.new(model)
-    local self = setmetatable({}, BoxEntry)
-    self.Model = model
-    self.IsFading = false
-    self.DeathPos = nil
-
-    self.Root = Instance.new("Frame")
-    self.Root.BorderSizePixel = 0
-    self.Root.BackgroundTransparency = 1
-    self.Root.Visible = false
-    self.Root.Parent = ScreenGui
+function Box.new()
+    local self = setmetatable({}, Box)
+    
+    self.Main = Instance.new("Frame")
+    self.Main.BackgroundColor3 = Color3.new(1, 1, 1)
+    self.Main.BackgroundTransparency = CFG.FillTransparency
+    self.Main.BorderSizePixel = 0
+    self.Main.Visible = false
+    self.Main.Parent = gui
     
 
-    self.Gradient = Instance.new("UIGradient")
-    self.Gradient.Color = ESP.GradientColor
-    self.Gradient.Rotation = 90
-    self.Gradient.Parent = self.Root
+    local grad = Instance.new("UIGradient")
+    grad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(160, 160, 160))
+    })
+    grad.Rotation = 90
+    grad.Parent = self.Main
 
-    self.Box = Instance.new("UIStroke")
-    self.Box.Thickness = 1
-    self.Box.Color = ESP.BoxColor
-    self.Box.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    self.Box.Parent = self.Root
+
+    self.Stroke = Instance.new("UIStroke")
+    self.Stroke.Thickness = 1
+    self.Stroke.Color = CFG.BoxColor
+    self.Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    self.Stroke.Parent = self.Main
     
+
     self.Outline = Instance.new("UIStroke")
     self.Outline.Thickness = 2
-    self.Outline.Color = Color3.new(0, 0, 0)
+    self.Outline.Color = CFG.OutlineColor
+    self.Outline.Transparency = 0.3
     self.Outline.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    self.Outline.Parent = self.Root
+    self.Outline.Parent = self.Main
     
+
     self.WeaponLabel = Instance.new("TextLabel")
     self.WeaponLabel.BackgroundTransparency = 1
-    self.WeaponLabel.Font = Enum.Font.Code
-    self.WeaponLabel.TextSize = 11
-    self.WeaponLabel.TextColor3 = ESP.WeaponColor
+    self.WeaponLabel.Font = CFG.Font
+    self.WeaponLabel.TextSize = CFG.TextSize
+    self.WeaponLabel.TextColor3 = CFG.WeaponColor
     self.WeaponLabel.TextStrokeTransparency = 0
-    self.WeaponLabel.AnchorPoint = Vector2.new(0.5, 0)
-    self.WeaponLabel.Parent = self.Root
+    self.WeaponLabel.AnchorPoint = Vector2.new(0.5, 1)
+    self.WeaponLabel.Parent = self.Main
+
+
+    self.DistLabel = Instance.new("TextLabel")
+    self.DistLabel.BackgroundTransparency = 1
+    self.DistLabel.Font = CFG.Font
+    self.DistLabel.TextSize = CFG.TextSize
+    self.DistLabel.TextColor3 = Color3.new(1, 1, 1)
+    self.DistLabel.TextStrokeTransparency = 0
+    self.DistLabel.AnchorPoint = Vector2.new(0.5, 0)
+    self.DistLabel.Parent = self.Main
     
-    self.DistanceLabel = Instance.new("TextLabel")
-    self.DistanceLabel.BackgroundTransparency = 1
-    self.DistanceLabel.Font = Enum.Font.Code
-    self.DistanceLabel.TextSize = 11
-    self.DistanceLabel.TextColor3 = ESP.DistanceColor
-    self.DistanceLabel.TextStrokeTransparency = 0
-    self.DistanceLabel.AnchorPoint = Vector2.new(0.5, 0)
-    self.DistanceLabel.Parent = self.Root
-    
+    self.LastVisibleTime = tick()
     return self
 end
 
-
-local function GetPerfectBox(model)
-    local cf, size = model:GetBoundingBox()
-    local corners = {
-        cf * CFrame.new(size.X/2, size.Y/2, size.Z/2),
-        cf * CFrame.new(-size.X/2, size.Y/2, size.Z/2),
-        cf * CFrame.new(size.X/2, -size.Y/2, size.Z/2),
-        cf * CFrame.new(-size.X/2, -size.Y/2, size.Z/2),
-        cf * CFrame.new(size.X/2, size.Y/2, -size.Z/2),
-        cf * CFrame.new(-size.X/2, size.Y/2, -size.Z/2),
-        cf * CFrame.new(size.X/2, -size.Y/2, -size.Z/2),
-        cf * CFrame.new(-size.X/2, -size.Y/2, -size.Z/2)
-    }
-
-    local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
-    local visible = false
-
-    for _, corner in ipairs(corners) do
-        local screenPos, onScreen = Camera:WorldToViewportPoint(corner.Position)
-        if onScreen then visible = true end
-        minX = math.min(minX, screenPos.X)
-        minY = math.min(minY, screenPos.Y)
-        maxX = math.max(maxX, screenPos.X)
-        maxY = math.max(maxY, screenPos.Y)
-    end
-
-    return visible, Vector2.new(minX, minY), Vector2.new(maxX - minX, maxY - minY)
-end
-
-function BoxEntry:Update()
-    if self.IsFading then return end
-    
-    local head = self.Model:FindFirstChild("head")
-    if not head or head:FindFirstChild("Username") then
-        self:Fade()
-        return
-    end
-
-    local onScreen, pos, size = GetPerfectBox(self.Model)
-
-    if onScreen then
-        self.Root.Position = UDim2.fromOffset(pos.X, pos.Y)
-        self.Root.Size = UDim2.fromOffset(size.X, size.Y)
-        
-        self.Root.BackgroundTransparency = ESP.Fill and ESP.FillTransparency or 1
-        self.Root.BackgroundColor3 = Color3.new(1,1,1)
-        
-        self.WeaponLabel.Text = "[" .. (self.Model:GetAttribute("item_type") or "None") .. "]"
-        self.WeaponLabel.Position = UDim2.new(0.5, 0, 1, 4)
-        
-        local dist = (Camera.CFrame.Position - head.Position).Magnitude
-        self.DistanceLabel.Text = math.floor(dist) .. "st"
-        self.DistanceLabel.Position = UDim2.new(0.5, 0, 1, ESP.Weapon and 16 or 4)
-        
-        self.Root.Visible = true
+function Box:Update(pos, size, weaponName, distance, isAlive)
+    if isAlive then
+        self.LastVisibleTime = tick()
+        self.Main.BackgroundTransparency = CFG.FillTransparency
+        self.Stroke.Transparency = 0
+        self.Outline.Transparency = 0.3
+        self.WeaponLabel.TextTransparency = 0
+        self.DistLabel.TextTransparency = 0
     else
-        self.Root.Visible = false
-    end
-end
 
-function BoxEntry:Fade()
-    if self.IsFading then return end
-    self.IsFading = true
-    
-
-    local cf, _ = self.Model:GetBoundingBox()
-    local lastWorldPos = cf.Position
-    
-    task.spawn(function()
-        local start = tick()
-        while tick() - start < ESP.FadeTime do
-            local alpha = (tick() - start) / ESP.FadeTime
-            
-
-            local sPos, onScreen = Camera:WorldToViewportPoint(lastWorldPos)
-            if onScreen then
-                self.Root.Position = UDim2.fromOffset(sPos.X - (self.Root.Size.X.Offset/2), sPos.Y - (self.Root.Size.Y.Offset/2))
-                self.Root.Visible = true
-            else
-                self.Root.Visible = false
-            end
-            
-            local trans = ESP.FillTransparency + (alpha * (1 - ESP.FillTransparency))
-            self.Root.BackgroundTransparency = math.clamp(trans, 0, 1)
-            self.Box.Transparency = alpha
-            self.Outline.Transparency = alpha
-            self.WeaponLabel.TextTransparency = alpha
-            self.DistanceLabel.TextTransparency = alpha
-            
-            RunService.RenderStepped:Wait()
+        local elapsed = tick() - self.LastVisibleTime
+        local alpha = math.clamp(1 - (elapsed / CFG.FadeDuration), 0, 1)
+        
+        self.Main.BackgroundTransparency = 1 - (alpha * (1 - CFG.FillTransparency))
+        self.Stroke.Transparency = 1 - alpha
+        self.Outline.Transparency = 1 - (alpha * 0.7)
+        self.WeaponLabel.TextTransparency = 1 - alpha
+        self.DistLabel.TextTransparency = 1 - alpha
+        
+        if alpha <= 0 then
+            self.Main.Visible = false
+            return
         end
-        self:Destroy()
-    end)
+    end
+
+    self.Main.Position = UDim2.fromOffset(pos.X, pos.Y)
+    self.Main.Size = UDim2.fromOffset(size.X, size.Y)
+    
+    self.WeaponLabel.Position = UDim2.new(0.5, 0, 0, -2)
+    self.WeaponLabel.Text = "[" .. (weaponName or "None") .. "]"
+    
+    self.DistLabel.Position = UDim2.new(0.5, 0, 1, 2)
+    self.DistLabel.Text = math.floor(distance) .. "st"
+    
+    self.Main.Visible = true
 end
 
-function BoxEntry:Destroy()
-    self.Root:Destroy()
-    ESP.Cache[self.Model] = nil
+
+local OFFSETS = {
+    Vector3.new(1, 1, 1), Vector3.new(-1, 1, 1),
+    Vector3.new(1, -1, 1), Vector3.new(-1, -1, 1),
+    Vector3.new(1, 1, -1), Vector3.new(-1, 1, -1),
+    Vector3.new(1, -1, -1), Vector3.new(-1, -1, -1),
+}
+
+local function GetBoundingBox(model)
+    local minX, minY = math.huge, math.huge
+    local maxX, maxY = -math.huge, -math.huge
+    local onScreen = false
+
+    for _, part in ipairs(model:GetChildren()) do
+        if part:IsA("BasePart") then
+            local cf = part.CFrame
+            local size = part.Size * 0.5
+            for _, offset in ipairs(OFFSETS) do
+                local screenPos, vis = Camera:WorldToViewportPoint(cf * (offset * size))
+                if vis then
+                    onScreen = true
+                    minX = math.min(minX, screenPos.X)
+                    minY = math.min(minY, screenPos.Y)
+                    maxX = math.max(maxX, screenPos.X)
+                    maxY = math.max(maxY, screenPos.Y)
+                end
+            end
+        end
+    end
+    if not onScreen then return nil end
+    return Vector2.new(minX, minY), Vector2.new(maxX - minX, maxY - minY)
 end
 
-function ESP:Init()
+function ESP.init()
+    local Viewmodels = workspace:WaitForChild("Viewmodels")
+    local cache = {}
+
     RunService.RenderStepped:Connect(function()
-        if not self.Enabled then return end
         for _, model in ipairs(Viewmodels:GetChildren()) do
             if model:IsA("Model") and model.Name ~= "LocalViewmodel" then
-                if not self.Cache[model] then self.Cache[model] = BoxEntry.new(model) end
-                self.Cache[model]:Update()
+                if not cache[model] then cache[model] = Box.new() end
+                
+                local pos, size = GetBoundingBox(model)
+                local isAlive = model:FindFirstChild("HumanoidRootPart") ~= nil
+                
+                if pos and size then
+                    local dist = (Camera.CFrame.Position - model:GetBoundingBox().Position).Magnitude
+                    local weapon = model:GetAttribute("EquippedWeapon") or "AK12"
+                    cache[model]:Update(pos, size, weapon, dist, isAlive)
+                end
             end
-        end
-        for model, entry in pairs(self.Cache) do
-            if not model:IsDescendantOf(Viewmodels) then entry:Fade() end
         end
     end)
 end
