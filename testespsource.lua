@@ -22,14 +22,14 @@ local CFG = {
     SkeletonColor      = Color3.fromRGB(255, 255, 255),
     SkeletonThick      = 1,
     SkeletonAlpha      = 0,
-    ChamVisibleColor   = Color3.fromRGB(255, 0, 0), -- set to red as requested
-    ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
+    ChamVisibleColor   = Color3.fromRGB(0, 150, 255), -- Blue when visible
+    ChamOccludedColor  = Color3.fromRGB(255, 0, 0),   -- Red when occluded (fixed)
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
     GlowPadScale       = 0.08,
-    GlowLayers         = 2,
-    GlowBaseAlpha      = 0.0,
-    GlowFalloff        = 0.35,
+    GlowLayers         = 1,
+    GlowBaseAlpha      = 0.2,
+    GlowFalloff        = 0.0, -- No falloff for stacked style
     RainbowSpeed       = 0.5,
 }
 
@@ -145,7 +145,7 @@ RAYCAST_PARAMS.FilterType = Enum.RaycastFilterType.Exclude
 local Box = {}
 Box.__index = Box
 
-local GLOW_PAD_MAX = 20
+local GLOW_PAD_MAX = 40
 
 function Box.new(features)
     local self      = setmetatable({}, Box)
@@ -164,16 +164,15 @@ function Box.new(features)
         self._glows = {}
         local n = math.max(1, math.floor(CFG.GlowLayers))
         for i = 1, n do
-            local alpha               = math.clamp(CFG.GlowBaseAlpha + (i - 1) * CFG.GlowFalloff, 0, 1)
             local glow                = Instance.new("ImageLabel")
             glow.BackgroundTransparency = 1
             glow.Image                = "rbxassetid://126327713982623"
             glow.ImageColor3          = CFG.GlowColor
-            glow.ImageTransparency    = alpha
-            glow.ZIndex               = -10 -- forced low ZIndex to stay behind ESP
+            glow.ImageTransparency    = CFG.GlowBaseAlpha
+            glow.ZIndex               = -1 -- Always behind ESP components
             glow.Visible              = false
             glow.Parent               = gui
-            self._glows[i] = { img = glow, baseAlpha = alpha }
+            self._glows[i] = { img = glow, baseAlpha = CFG.GlowBaseAlpha }
         end
     end
 
@@ -191,7 +190,7 @@ function Box.new(features)
         name.TextXAlignment         = Enum.TextXAlignment.Center
         name.Text                   = ""
         name.Visible                = false
-        name.ZIndex                 = 10
+        name.ZIndex                 = self._border.ZIndex + 1
         name.Parent                 = gui
         self._name                  = name
     end
@@ -210,7 +209,7 @@ function Box.new(features)
         dist.TextXAlignment         = Enum.TextXAlignment.Center
         dist.Text                   = ""
         dist.Visible                = false
-        dist.ZIndex                 = 10
+        dist.ZIndex                 = self._border.ZIndex + 1
         dist.Parent                 = gui
         self._dist                  = dist
     end
@@ -220,7 +219,7 @@ function Box.new(features)
         hpBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
         hpBg.BorderSizePixel  = 0
         hpBg.Visible          = false
-        hpBg.ZIndex           = 9
+        hpBg.ZIndex           = self._border.ZIndex + 1
         hpBg.Parent           = gui
         self._hpBg            = hpBg
 
@@ -229,7 +228,7 @@ function Box.new(features)
         hpFill.BorderSizePixel  = 0
         hpFill.AnchorPoint      = Vector2.new(0, 0)
         hpFill.Visible          = false
-        hpFill.ZIndex           = 10
+        hpFill.ZIndex           = self._border.ZIndex + 2
         hpFill.Parent           = gui
         self._hpFill            = hpFill
 
@@ -247,7 +246,7 @@ function Box.new(features)
             hpText.TextXAlignment         = Enum.TextXAlignment.Right
             hpText.Text                   = ""
             hpText.Visible                = false
-            hpText.ZIndex                 = 11
+            hpText.ZIndex                 = self._border.ZIndex + 3
             hpText.Parent                 = gui
             self._hpText                  = hpText
         end
@@ -265,9 +264,10 @@ end
 
 local function applyGlowLayers(glows, x, y, w, h)
     if not glows then return end
-    local base = math.min(math.min(w, h) * CFG.GlowPadScale, GLOW_PAD_MAX)
+    -- Anchor fixed to outer bounds by ensuring padding starts FROM the ESP box
+    local pad = math.min(math.min(w, h) * CFG.GlowPadScale, GLOW_PAD_MAX)
     for i, entry in ipairs(glows) do
-        local pad = base * i
+        -- "Stacking" means they all share the same pad/position rather than growing outward
         entry.img.Position = UDim2.fromOffset(x - pad, y - pad)
         entry.img.Size     = UDim2.fromOffset(w + pad * 2, h + pad * 2)
         entry.img.Visible  = true
@@ -432,31 +432,28 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
         local activeParts = {}
         for _, part in ipairs(character:GetChildren()) do
             if part:IsA("BasePart") then
-                -- HITSCAN CHECK: Only show chams for parts that the camera can actually see
                 RAYCAST_PARAMS.FilterDescendantsInstances = {LocalPlayer.Character, character}
                 local result = workspace:Raycast(Camera.CFrame.Position, part.Position - Camera.CFrame.Position, RAYCAST_PARAMS)
                 
-                local isPartVisible = (result == nil)
-
-                if isPartVisible then
-                    activeParts[part] = true
-                    local adorn = self._chams[part]
-                    if not adorn then
-                        adorn             = Instance.new("BoxHandleAdornment")
-                        adorn.AlwaysOnTop = true
-                        adorn.ZIndex      = 5
-                        adorn.Adornee      = part
-                        adorn.Parent      = part
-                        self._chams[part] = adorn
-                    end
-                    adorn.Size         = part.Size + Vector3.new(0.02, 0.02, 0.02)
-                    adorn.Color3       = CFG.ChamVisibleColor
-                    adorn.Transparency = CFG.ChamTransparency
+                local isVisible = (result == nil)
+                activeParts[part] = true
+                
+                local adorn = self._chams[part]
+                if not adorn then
+                    adorn             = Instance.new("BoxHandleAdornment")
+                    adorn.AlwaysOnTop = true
+                    adorn.ZIndex      = 5
+                    adorn.Adornee     = part
+                    adorn.Parent      = part
+                    self._chams[part] = adorn
                 end
+                
+                adorn.Size         = part.Size + Vector3.new(0.02, 0.02, 0.02)
+                -- Visible = Blue, Occluded = Red
+                adorn.Color3       = isVisible and CFG.ChamVisibleColor or CFG.ChamOccludedColor
+                adorn.Transparency = CFG.ChamTransparency
             end
         end
-        
-        -- Clean up parts that are no longer visible or part of character
         for part, adorn in pairs(self._chams) do
             if not activeParts[part] then
                 pcall(function() adorn:Destroy() end)
