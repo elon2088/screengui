@@ -22,14 +22,14 @@ local CFG = {
     SkeletonColor      = Color3.fromRGB(255, 255, 255),
     SkeletonThick      = 1,
     SkeletonAlpha      = 0,
-    ChamVisibleColor   = Color3.fromRGB(0, 150, 255), -- Blue when visible
-    ChamOccludedColor  = Color3.fromRGB(255, 0, 0),   -- Red when occluded (fixed)
+    ChamVisibleColor   = Color3.fromRGB(0, 150, 255),
+    ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
-    GlowPadScale       = 0.08,
+    GlowPadScale       = 0.1, 
     GlowLayers         = 1,
     GlowBaseAlpha      = 0.2,
-    GlowFalloff        = 0.0, -- No falloff for stacked style
+    GlowFalloff        = 0.0,
     RainbowSpeed       = 0.5,
 }
 
@@ -145,7 +145,7 @@ RAYCAST_PARAMS.FilterType = Enum.RaycastFilterType.Exclude
 local Box = {}
 Box.__index = Box
 
-local GLOW_PAD_MAX = 40
+local GLOW_PAD_MAX = 50 
 
 function Box.new(features)
     local self      = setmetatable({}, Box)
@@ -169,7 +169,7 @@ function Box.new(features)
             glow.Image                = "rbxassetid://126327713982623"
             glow.ImageColor3          = CFG.GlowColor
             glow.ImageTransparency    = CFG.GlowBaseAlpha
-            glow.ZIndex               = -1 -- Always behind ESP components
+            glow.ZIndex               = -1
             glow.Visible              = false
             glow.Parent               = gui
             self._glows[i] = { img = glow, baseAlpha = CFG.GlowBaseAlpha }
@@ -264,10 +264,12 @@ end
 
 local function applyGlowLayers(glows, x, y, w, h)
     if not glows then return end
-    -- Anchor fixed to outer bounds by ensuring padding starts FROM the ESP box
+    
+    
     local pad = math.min(math.min(w, h) * CFG.GlowPadScale, GLOW_PAD_MAX)
+    
     for i, entry in ipairs(glows) do
-        -- "Stacking" means they all share the same pad/position rather than growing outward
+       
         entry.img.Position = UDim2.fromOffset(x - pad, y - pad)
         entry.img.Size     = UDim2.fromOffset(w + pad * 2, h + pad * 2)
         entry.img.Visible  = true
@@ -449,7 +451,6 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
                 end
                 
                 adorn.Size         = part.Size + Vector3.new(0.02, 0.02, 0.02)
-                -- Visible = Blue, Occluded = Red
                 adorn.Color3       = isVisible and CFG.ChamVisibleColor or CFG.ChamOccludedColor
                 adorn.Transparency = CFG.ChamTransparency
             end
