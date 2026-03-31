@@ -22,7 +22,7 @@ local CFG = {
     SkeletonColor      = Color3.fromRGB(255, 255, 255),
     SkeletonThick      = 1,
     SkeletonAlpha      = 0,
-    ChamVisibleColor   = Color3.fromRGB(0, 150, 255),
+    ChamVisibleColor   = Color3.fromRGB(0, 255, 0),
     ChamOccludedColor  = Color3.fromRGB(255, 0, 0),
     ChamTransparency   = 0.5,
     GlowColor          = Color3.fromRGB(202, 243, 255),
@@ -170,12 +170,13 @@ function Box.new(features)
             glow.Image                = "rbxassetid://126327713982623"
             glow.ImageColor3          = CFG.GlowColor
             glow.ImageTransparency    = alpha
-            glow.ZIndex               = self._outer.ZIndex - 2 - (n - i)
+            glow.ZIndex               = self._outer.ZIndex - 2
+            glow.ScaleType            = Enum.ScaleType.Slice
+            glow.SliceCenter          = Rect.new(10, 10, 118, 118)
             glow.Visible              = false
             glow.Parent               = gui
             self._glows[i] = { img = glow, baseAlpha = alpha }
         end
-        -- REMOVED GLOW MASK (THE CAUSE OF THE BLACK BOX)
     end
 
     if features.name then
@@ -190,7 +191,6 @@ function Box.new(features)
         name.TextStrokeTransparency = 0
         name.TextStrokeColor3       = CFG.OutlineColor
         name.TextXAlignment         = Enum.TextXAlignment.Center
-        name.Text                   = ""
         name.Visible                = false
         name.ZIndex                 = self._border.ZIndex + 1
         name.Parent                 = gui
@@ -209,7 +209,6 @@ function Box.new(features)
         dist.TextStrokeTransparency = 0
         dist.TextStrokeColor3       = CFG.OutlineColor
         dist.TextXAlignment         = Enum.TextXAlignment.Center
-        dist.Text                   = ""
         dist.Visible                = false
         dist.ZIndex                 = self._border.ZIndex + 1
         dist.Parent                 = gui
@@ -246,7 +245,6 @@ function Box.new(features)
             hpText.TextStrokeTransparency = 0
             hpText.TextStrokeColor3       = Color3.fromRGB(0, 0, 0)
             hpText.TextXAlignment         = Enum.TextXAlignment.Right
-            hpText.Text                   = ""
             hpText.Visible                = false
             hpText.ZIndex                 = self._border.ZIndex + 3
             hpText.Parent                 = gui
@@ -257,68 +255,7 @@ function Box.new(features)
     if features.skeleton then self._lines = {} end
     if features.chams    then self._chams = {} end
 
-    self._outer.Visible  = false
-    self._border.Visible = false
-    self._inner.Visible  = false
-
     return self
-end
-
-local function applyGlowLayers(glows, x, y, w, h)
-    if not glows then return end
-    local base = math.min(math.min(w, h) * CFG.GlowPadScale, GLOW_PAD_MAX)
-    for i, entry in ipairs(glows) do
-        local pad = base * i
-        entry.img.Position = UDim2.fromOffset(x - pad, y - pad)
-        entry.img.Size     = UDim2.fromOffset(w + pad * 2, h + pad * 2)
-        entry.img.Visible  = true
-    end
-end
-
-function Box:SetTransparency(t)
-    local t1 = math.clamp(t, 0, 1)
-    self._outerStroke.Transparency  = t1
-    self._borderStroke.Transparency = t1
-    self._innerStroke.Transparency  = t1
-    if self._glows then
-        for _, entry in ipairs(self._glows) do
-            entry.img.ImageTransparency = entry.baseAlpha + (1 - entry.baseAlpha) * t1
-        end
-    end
-
-    if self._name  then
-        self._name.TextTransparency       = t1
-        self._name.TextStrokeTransparency = t1
-    end
-    if self._dist then
-        self._dist.TextTransparency       = t1
-        self._dist.TextStrokeTransparency = t1
-    end
-    if self._hpBg   then self._hpBg.BackgroundTransparency   = t1 end
-    if self._hpFill then self._hpFill.BackgroundTransparency = t1 end
-    if self._hpText then
-        self._hpText.TextTransparency       = t1
-        self._hpText.TextStrokeTransparency = t1
-    end
-    if self._lines then
-        for _, line in ipairs(self._lines) do
-            line.BackgroundTransparency = math.clamp(CFG.SkeletonAlpha + (1 - CFG.SkeletonAlpha) * t1, 0, 1)
-        end
-    end
-    if self._chams then
-        for _, adorn in pairs(self._chams) do
-            adorn.Transparency = math.clamp(CFG.ChamTransparency + (1 - CFG.ChamTransparency) * t1, 0, 1)
-        end
-    end
-end
-
-function Box:ClearChams()
-    if self._chams then
-        for part, adorn in pairs(self._chams) do
-            pcall(function() adorn:Destroy() end)
-            self._chams[part] = nil
-        end
-    end
 end
 
 function Box:Update(pos, size, displayName, distance, health, maxHealth, character)
@@ -338,9 +275,6 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
         if self._lines then
             for _, line in ipairs(self._lines) do line.BackgroundColor3 = c end
         end
-        if self._chams then
-            for _, adorn in pairs(self._chams) do adorn.Color3 = c end
-        end
     end
 
     self._outer.Position  = UDim2.fromOffset(x - 1, y - 1)
@@ -355,7 +289,15 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     self._inner.Size      = UDim2.fromOffset(w - 2, h - 2)
     self._inner.Visible   = true
 
-    applyGlowLayers(self._glows, x, y, w, h)
+    if self._glows then
+        local pad = math.min(math.min(w, h) * CFG.GlowPadScale, GLOW_PAD_MAX)
+        for i, entry in ipairs(self._glows) do
+            local currentPad = pad * i
+            entry.img.Position = UDim2.fromOffset(x - currentPad, y - currentPad)
+            entry.img.Size     = UDim2.fromOffset(w + (currentPad * 2), h + (currentPad * 2))
+            entry.img.Visible  = true
+        end
+    end
 
     if f.name and self._name then
         self._name.Position = UDim2.fromOffset(x + w * 0.5, y - 2)
@@ -417,7 +359,6 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
                 local s2, v2 = Camera:WorldToViewportPoint(p2Part.Position)
                 if v1 and v2 then
                     if not _rainbowEnabled then line.BackgroundColor3 = CFG.SkeletonColor end
-                    line.BackgroundTransparency = CFG.SkeletonAlpha
                     updateLine(line, Vector2.new(s1.X, s1.Y), Vector2.new(s2.X, s2.Y))
                 else
                     line.Visible = false
@@ -430,16 +371,7 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
     end
 
     if f.chams and self._chams and character then
-        local isVisible = false
-        local root = character:FindFirstChild("HumanoidRootPart")
-        if root then
-            RAYCAST_PARAMS.FilterDescendantsInstances = {character}
-            local result = workspace:Raycast(Camera.CFrame.Position, root.Position - Camera.CFrame.Position, RAYCAST_PARAMS)
-            isVisible    = result == nil
-        end
-        local chamColor = _rainbowEnabled and CFG.ChamVisibleColor
-            or (f.chamsVisibleCheck and (isVisible and CFG.ChamVisibleColor or CFG.ChamOccludedColor)
-            or CFG.ChamVisibleColor)
+        RAYCAST_PARAMS.FilterDescendantsInstances = {LocalPlayer.Character, character}
         local activeParts = {}
         for _, part in ipairs(character:GetChildren()) do
             if part:IsA("BasePart") then
@@ -453,7 +385,16 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
                     adorn.Parent      = part
                     self._chams[part] = adorn
                 end
-                adorn.Size         = part.Size + Vector3.new(0.02, 0.02, 0.02)
+                
+                local origin = Camera.CFrame.Position
+                local dir    = part.Position - origin
+                local result = workspace:Raycast(origin, dir, RAYCAST_PARAMS)
+                
+                local isVisible = (result == nil)
+                local chamColor = _rainbowEnabled and CFG.ChamVisibleColor
+                    or (isVisible and CFG.ChamVisibleColor or CFG.ChamOccludedColor)
+                
+                adorn.Size         = part.Size + Vector3.new(0.01, 0.01, 0.01)
                 adorn.Color3       = chamColor
                 adorn.Transparency = CFG.ChamTransparency
             end
@@ -463,6 +404,42 @@ function Box:Update(pos, size, displayName, distance, health, maxHealth, charact
                 pcall(function() adorn:Destroy() end)
                 self._chams[part] = nil
             end
+        end
+    end
+end
+
+function Box:SetTransparency(t)
+    local t1 = math.clamp(t, 0, 1)
+    self._outerStroke.Transparency  = t1
+    self._borderStroke.Transparency = t1
+    self._innerStroke.Transparency  = t1
+    if self._glows then
+        for _, entry in ipairs(self._glows) do
+            entry.img.ImageTransparency = entry.baseAlpha + (1 - entry.baseAlpha) * t1
+        end
+    end
+    if self._name  then
+        self._name.TextTransparency       = t1
+        self._name.TextStrokeTransparency = t1
+    end
+    if self._dist then
+        self._dist.TextTransparency       = t1
+        self._dist.TextStrokeTransparency = t1
+    end
+    if self._hpBg   then self._hpBg.BackgroundTransparency   = t1 end
+    if self._hpFill then self._hpFill.BackgroundTransparency = t1 end
+    if self._hpText then
+        self._hpText.TextTransparency       = t1
+        self._hpText.TextStrokeTransparency = t1
+    end
+    if self._lines then
+        for _, line in ipairs(self._lines) do
+            line.BackgroundTransparency = math.clamp(CFG.SkeletonAlpha + (1 - CFG.SkeletonAlpha) * t1, 0, 1)
+        end
+    end
+    if self._chams then
+        for _, adorn in pairs(self._chams) do
+            adorn.Transparency = math.clamp(CFG.ChamTransparency + (1 - CFG.ChamTransparency) * t1, 0, 1)
         end
     end
 end
@@ -493,15 +470,11 @@ function Box:Destroy()
     if self._hpBg     then self._hpBg:Destroy()     end
     if self._hpFill   then self._hpFill:Destroy()   end
     if self._hpText   then self._hpText:Destroy()   end
-    if self._lines    then
+    if self._lines then
         for _, l in ipairs(self._lines) do l:Destroy() end
-        table.clear(self._lines)
     end
     if self._chams then
-        for part, adorn in pairs(self._chams) do
-            pcall(function() adorn:Destroy() end)
-            self._chams[part] = nil
-        end
+        for _, adorn in pairs(self._chams) do pcall(function() adorn:Destroy() end) end
     end
 end
 
@@ -540,9 +513,7 @@ local _activeESP = nil
 
 function ESP.new(features)
     if _activeESP then _activeESP:Disable() end
-
     local self = setmetatable({}, ESP)
-
     self._features = {
         name              = features.name              ~= false,
         distance          = features.distance          ~= false,
@@ -550,53 +521,20 @@ function ESP.new(features)
         healthtext        = features.healthtext        ~= false,
         skeleton          = features.skeleton          == true,
         chams             = features.chams             == true,
-        chamsVisibleCheck = features.chamsVisibleCheck ~= false,
         glow              = features.glow              == true,
     }
-
     self._fadeDuration = features.FadeDuration or 2.5
-
-    if features.BorderColor       then CFG.BorderColor       = features.BorderColor       end
-    if features.OutlineColor      then CFG.OutlineColor      = features.OutlineColor      end
-    if features.NameColor         then CFG.NameColor         = features.NameColor         end
-    if features.DistColor         then CFG.DistColor         = features.DistColor         end
-    if features.BorderThick       then CFG.BorderThick       = features.BorderThick       end
-    if features.OutlineThick      then CFG.OutlineThick      = features.OutlineThick      end
-    if features.HealthWidth       then CFG.HealthWidth       = features.HealthWidth       end
-    if features.HealthGap         then CFG.HealthGap         = features.HealthGap         end
-    if features.HealthLerp        then CFG.HealthLerp        = features.HealthLerp        end
-    if features.NameSize          then CFG.NameSize          = features.NameSize          end
-    if features.DistSize          then CFG.DistSize          = features.DistSize          end
-    if features.HealthTextSize    then CFG.HealthTextSize    = features.HealthTextSize    end
-    if features.SkeletonColor     then CFG.SkeletonColor     = features.SkeletonColor     end
-    if features.SkeletonThick     then CFG.SkeletonThick     = features.SkeletonThick     end
-    if features.SkeletonAlpha     then CFG.SkeletonAlpha     = features.SkeletonAlpha     end
-    if features.ChamVisibleColor  then CFG.ChamVisibleColor  = features.ChamVisibleColor  end
-    if features.ChamOccludedColor then CFG.ChamOccludedColor = features.ChamOccludedColor end
-    if features.ChamTransparency  then CFG.ChamTransparency  = features.ChamTransparency  end
-    if features.GlowColor         then CFG.GlowColor         = features.GlowColor         end
-    if features.GlowPadScale      then CFG.GlowPadScale      = features.GlowPadScale      end
-    if features.GlowLayers        then CFG.GlowLayers        = features.GlowLayers        end
-    if features.GlowBaseAlpha     then CFG.GlowBaseAlpha     = features.GlowBaseAlpha     end
-    if features.GlowFalloff       then CFG.GlowFalloff       = features.GlowFalloff       end
-    if features.RainbowSpeed      then CFG.RainbowSpeed      = features.RainbowSpeed      end
-
     _rainbowEnabled = features.rainbow == true
     if _rainbowEnabled then startRainbow() else stopRainbow() end
-
     self._Box            = function() return Box.new(self._features) end
     self._GetBoundingBox = GetBoundingBox
-    self._destroy        = nil
-
     _activeESP = self
     return self
 end
 
 function ESP:Enable()
     if self._destroy then return end
-    local PlayerHandler = loadstring(game:HttpGet(
-        "https://raw.githubusercontent.com/elon2088/screengui/refs/heads/main/ph.lua"
-    ))()
+    local PlayerHandler = loadstring(game:HttpGet("https://raw.githubusercontent.com/elon2088/screengui/refs/heads/main/ph.lua"))()
     self._destroy = PlayerHandler.init({
         LocalPlayer    = LocalPlayer,
         Players        = Players,
@@ -609,25 +547,9 @@ function ESP:Enable()
 end
 
 function ESP:Disable()
-    if self._destroy then
-        self._destroy()
-        self._destroy = nil
-    end
+    if self._destroy then self._destroy() self._destroy = nil end
     stopRainbow()
     gui.Enabled = false
-end
-
-function ESP:Toggle()
-    if self._destroy then self:Disable() else self:Enable() end
-end
-
-function ESP:SetRainbow(enabled)
-    _rainbowEnabled = enabled
-    if enabled then startRainbow() else stopRainbow() end
-end
-
-function ESP:SetConfig(key, value)
-    CFG[key] = value
 end
 
 return ESP
